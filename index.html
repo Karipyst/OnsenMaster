@@ -11,7 +11,6 @@
 
 <style>
 body { margin:0; font-family:sans-serif; background:#f5f1e6; }
-
 #map { height:45vh; }
 
 .card {
@@ -28,7 +27,6 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   margin:10px; padding:10px;
   background:#fff; border-radius:12px;
 }
-
 .selected-item {
   padding:10px; margin:5px 0;
   background:#eee; border-radius:8px;
@@ -56,7 +54,7 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   color:#fff;
 }
 
-/* ===== マーカー ===== */
+/* マーカー */
 .marker {
   position: relative;
   width: 30px;
@@ -68,14 +66,12 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   color:#fff;
   font-size:16px;
 }
-
 .marker.selected {
   transform:scale(1.2);
   border:2px solid #fff;
   box-shadow:0 0 6px rgba(0,0,0,0.5);
 }
 
-/* 番号表示 */
 .marker-number {
   position:absolute;
   top:-8px;
@@ -90,10 +86,8 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   align-items:center;
   justify-content:center;
   font-weight:bold;
-  z-index:10;
 }
 
-/* 泉質カラー */
 .type-塩化物泉 { background:#e74c3c; }
 .type-炭酸泉 { background:#3498db; }
 .type-単純温泉 { background:#7f8c8d; }
@@ -121,28 +115,44 @@ GoogleMapで開く
 
 <script>
 
-// ★ここを差し替え
 const MAPTILER_KEY = "5803br5MI3qRfp9DVSHL";
 
-const onsens=[
-{ name:"有馬温泉",lat:34.796,lng:135.248,type:"塩化物泉"},
-{ name:"よかたん温泉",lat:34.785,lng:134.983,type:"炭酸泉"},
-{ name:"鈴蘭の湯",lat:34.739,lng:135.144,type:"単純温泉"}
-];
-
-let selected=[];
+let onsens = [];
+let selected = [];
 let map;
-let markers=[];
-let startFromCurrent=true;
+let markers = [];
+let startFromCurrent = true;
 
-initMap();
+/* ===== CSV読み込み ===== */
+async function loadCSV(){
+  const res = await fetch("onsen.csv");
+  const text = await res.text();
 
-function initMap(){
+  const lines = text.trim().split("\n");
+
+  onsens = lines.slice(1).map(line=>{
+    const cols = line.split(",");
+
+    return {
+      name: cols[0],
+      lat: Number(cols[1]),
+      lng: Number(cols[2]),
+      type: cols[3]
+    };
+  });
+}
+
+/* ===== 初期化 ===== */
+async function initMap(){
+
+  await loadCSV();
+
   map = new maplibregl.Map({
     container:'map',
     style:`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
     center:[135.15,34.75],
-    zoom:9
+    zoom:9,
+    projection:'mercator'
   });
 
   map.addControl(new maplibregl.NavigationControl());
@@ -150,40 +160,42 @@ function initMap(){
   map.on('load', render);
 }
 
+initMap();
+
+/* ===== 描画 ===== */
 function render(){
+
   document.getElementById("list").innerHTML="";
   markers.forEach(m=>m.remove());
   markers=[];
 
   onsens.forEach((o,i)=>{
 
-    // DOMマーカー
-  const el = document.createElement("div");
-  el.className = `marker type-${o.type}`;
-  el.innerHTML = "♨";
+    const el = document.createElement("div");
+    el.className = `marker type-${o.type}`;
+    el.innerHTML = "♨";
 
-  const orderIndex = selected.indexOf(i);
-  if(orderIndex !== -1){
-    el.classList.add("selected");
+    const orderIndex = selected.indexOf(i);
+    if(orderIndex !== -1){
+      el.classList.add("selected");
 
-    const num = document.createElement("div");
-    num.className = "marker-number";
-    num.innerText = orderIndex + 1;
-    el.appendChild(num);
-  }
+      const num = document.createElement("div");
+      num.className = "marker-number";
+      num.innerText = orderIndex + 1;
+      el.appendChild(num);
+    }
 
-  const marker = new maplibregl.Marker({
-    element: el   // ←ここ重要（明示指定）
-  })
-    .setLngLat([o.lng,o.lat])
-    .setPopup(new maplibregl.Popup().setText(o.name))
-    .addTo(map);
+    const marker = new maplibregl.Marker({
+      element: el,
+      anchor: 'bottom'
+    })
+      .setLngLat([o.lng, o.lat])
+      .setPopup(new maplibregl.Popup().setText(o.name))
+      .addTo(map);
 
-  markers.push(marker);
-  
+    markers.push(marker);
 
-    /* ===== リスト ===== */
-    const div=document.createElement("div");
+    const div = document.createElement("div");
     div.className="card";
     if(selected.includes(i)) div.classList.add("active");
 
@@ -196,15 +208,17 @@ function render(){
   renderSelected();
 }
 
+/* ===== 選択 ===== */
 function toggle(i){
   if(selected.includes(i)){
-    selected=selected.filter(x=>x!==i);
+    selected = selected.filter(x=>x!==i);
   }else{
     selected.push(i);
   }
   render();
 }
 
+/* ===== 並び替え ===== */
 function renderSelected(){
   const el=document.getElementById("selected");
   el.innerHTML="";
@@ -226,6 +240,7 @@ function renderSelected(){
   });
 }
 
+/* ===== 出発地切替 ===== */
 function toggleStartMode(){
   startFromCurrent=!startFromCurrent;
   const btn=document.getElementById("toggleStart");
@@ -233,6 +248,7 @@ function toggleStartMode(){
   btn.innerText="現在地から：" + (startFromCurrent ? "ON" : "OFF");
 }
 
+/* ===== ルート生成 ===== */
 function generateRoute(){
   if(selected.length<1) return;
 
