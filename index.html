@@ -124,41 +124,70 @@ let map;
 let markers = [];
 let startFromCurrent = true;
 
-/* ===== CSV読み込み（安全版） ===== */
+/* ===== CSV読み込み（完全安全版） ===== */
 async function loadCSV(){
   const res = await fetch("onsen.csv");
   let text = await res.text();
 
-  // BOM除去
   text = text.replace(/^\uFEFF/, '');
-
   const lines = text.trim().split(/\r?\n/);
 
+  const delimiter = lines[0].includes(",") ? "," :
+                    lines[0].includes(";") ? ";" : "\t";
+
+  const headers = lines[0].split(delimiter).map(h=>h.trim());
+
+  const idx = {
+    name: headers.indexOf("name"),
+    lat: headers.indexOf("lat"),
+    lng: headers.indexOf("lng"),
+    type: headers.indexOf("type")
+  };
+
   onsens = lines.slice(1).map(line=>{
-    const cols = line.split(",");
+    const cols = line.split(delimiter);
 
     return {
-      name: cols[0].trim(),
-      lat: Number(cols[1].trim()),
-      lng: Number(cols[2].trim()),
-      type: cols[3].trim()
+      name: cols[idx.name].trim(),
+      lat: Number(cols[idx.lat].trim()),
+      lng: Number(cols[idx.lng].trim()),
+      type: cols[idx.type].trim()
     };
   });
 
-  console.log("onsens:", onsens); // デバッグ確認
+  console.log("onsens:", onsens);
 }
 
-/* ===== 初期化 ===== */
+/* ===== 初期化（rasterでズレ完全防止） ===== */
 async function initMap(){
 
   await loadCSV();
 
   map = new maplibregl.Map({
     container:'map',
-    style:`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
+
+    style: {
+      version: 8,
+      sources: {
+        "raster-tiles": {
+          type: "raster",
+          tiles: [
+            `https://api.maptiler.com/maps/basic/{z}/{x}/{y}.png?key=${MAPTILER_KEY}`
+          ],
+          tileSize: 256
+        }
+      },
+      layers: [
+        {
+          id: "simple-tiles",
+          type: "raster",
+          source: "raster-tiles"
+        }
+      ]
+    },
+
     center:[135.15,34.75],
-    zoom:9,
-    projection:'mercator'
+    zoom:9
   });
 
   map.addControl(new maplibregl.NavigationControl());
