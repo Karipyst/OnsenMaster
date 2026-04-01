@@ -195,7 +195,7 @@ function render(){
       element: el,
       anchor: 'bottom'
     })
-      .setLngLat([Number(o.lng), Number(o.lat)])
+      .setLngLat([o.lng, o.lat])
       .setPopup(new maplibregl.Popup().setText(o.name))
       .addTo(map);
 
