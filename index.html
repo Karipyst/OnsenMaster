@@ -124,23 +124,28 @@ let map;
 let markers = [];
 let startFromCurrent = true;
 
-/* ===== CSV読み込み ===== */
+/* ===== CSV読み込み（安全版） ===== */
 async function loadCSV(){
   const res = await fetch("onsen.csv");
-  const text = await res.text();
+  let text = await res.text();
 
-  const lines = text.trim().split("\n");
+  // BOM除去
+  text = text.replace(/^\uFEFF/, '');
+
+  const lines = text.trim().split(/\r?\n/);
 
   onsens = lines.slice(1).map(line=>{
     const cols = line.split(",");
 
     return {
-      name: cols[0],
-      lat: Number(cols[1]),
-      lng: Number(cols[2]),
-      type: cols[3]
+      name: cols[0].trim(),
+      lat: Number(cols[1].trim()),
+      lng: Number(cols[2].trim()),
+      type: cols[3].trim()
     };
   });
+
+  console.log("onsens:", onsens); // デバッグ確認
 }
 
 /* ===== 初期化 ===== */
