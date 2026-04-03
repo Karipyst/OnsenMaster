@@ -11,7 +11,7 @@
 
 <style>
 body { margin:0; font-family:sans-serif; background:#f5f1e6; }
-#map { height:45vh; }
+#map { height:45dvh; }
 
 .card {
   margin:10px; padding:15px;
@@ -53,46 +53,6 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   background:#e67e22;
   color:#fff;
 }
-
-/* マーカー */
-.marker {
-  position: relative;
-  width: 30px;
-  height: 30px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  border-radius:50%;
-  color:#fff;
-  font-size:16px;
-}
-.marker.selected {
-  transform:scale(1.2);
-  border:2px solid #fff;
-  box-shadow:0 0 6px rgba(0,0,0,0.5);
-}
-
-.marker-number {
-  position:absolute;
-  top:-8px;
-  left:-8px;
-  background:#000;
-  color:#fff;
-  font-size:10px;
-  width:18px;
-  height:18px;
-  border-radius:50%;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  font-weight:bold;
-}
-
-.type-塩化物泉 { background:#e74c3c; }
-.type-炭酸泉 { background:#3498db; }
-.type-単純温泉 { background:#7f8c8d; }
-.type-含鉄泉 { background:#d2691e; }
-
 </style>
 </head>
 
@@ -121,31 +81,24 @@ const MAPTILER_KEY = "5803br5MI3qRfp9DVSHL";
 let onsens = [];
 let selected = [];
 let map;
-let markers = [];
-let startFromCurrent = true;
 
-/* ===== CSV読み込み（安全版） ===== */
+/* ===== CSV読み込み ===== */
 async function loadCSV(){
   const res = await fetch("onsen.csv");
   let text = await res.text();
-
-  // BOM除去
   text = text.replace(/^\uFEFF/, '');
 
   const lines = text.trim().split(/\r?\n/);
 
   onsens = lines.slice(1).map(line=>{
     const cols = line.split(",");
-
     return {
       name: cols[0].trim(),
-      lat: Number(cols[1].trim()),
-      lng: Number(cols[2].trim()),
-      type: cols[3].trim()
+      lat: Number(cols[1]),
+      lng: Number(cols[2]),
+      type: cols[3]
     };
   });
-
-  console.log("onsens:", onsens); // デバッグ確認
 }
 
 /* ===== 初期化 ===== */
@@ -157,58 +110,124 @@ async function initMap(){
     container:'map',
     style:`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
     center:[135.15,34.75],
-    zoom:9,
-    projection:'mercator'
+    zoom:6
   });
 
   map.addControl(new maplibregl.NavigationControl());
 
-  map.on('load', render);
+  map.on('load', () => {
+    map.resize();
+    setupSource();
+    renderList();
+  });
 }
 
 initMap();
 
-/* ===== 描画 ===== */
-function render(){
+/* ===== GeoJSON + cluster ===== */
+function setupSource(){
 
-  document.getElementById("list").innerHTML="";
-  markers.forEach(m=>m.remove());
-  markers=[];
+  const geojson = {
+    type: 'FeatureCollection',
+    features: onsens.map((o,i)=>({
+      type:'Feature',
+      geometry:{
+        type:'Point',
+        coordinates:[o.lng, o.lat]
+      },
+      properties:{
+        id: i,
+        name: o.name
+      }
+    }))
+  };
+
+  map.addSource('onsens', {
+    type:'geojson',
+    data: geojson,
+    cluster:true,
+    clusterMaxZoom:10,
+    clusterRadius:50
+  });
+
+  /* クラスター円 */
+  map.addLayer({
+    id:'clusters',
+    type:'circle',
+    source:'onsens',
+    filter:['has','point_count'],
+    paint:{
+      'circle-color':'#e67e22',
+      'circle-radius':[
+        'step',['get','point_count'],
+        15,10,20,30,25
+      ]
+    }
+  });
+
+  /* クラスター数 */
+  map.addLayer({
+    id:'cluster-count',
+    type:'symbol',
+    source:'onsens',
+    filter:['has','point_count'],
+    layout:{
+      'text-field':['get','point_count'],
+      'text-size':12
+    }
+  });
+
+  /* 単体ポイント */
+  map.addLayer({
+    id:'unclustered',
+    type:'circle',
+    source:'onsens',
+    filter:['!has','point_count'],
+    paint:{
+      'circle-color':'#3498db',
+      'circle-radius':6
+    }
+  });
+
+  /* クラスタクリックでズーム */
+  map.on('click','clusters', (e)=>{
+    const features = map.queryRenderedFeatures(e.point,{layers:['clusters']});
+    const clusterId = features[0].properties.cluster_id;
+
+    map.getSource('onsens').getClusterExpansionZoom(clusterId, (err, zoom)=>{
+      if(err) return;
+      map.easeTo({
+        center: features[0].geometry.coordinates,
+        zoom: zoom
+      });
+    });
+  });
+
+  /* 単体クリック */
+  map.on('click','unclustered', (e)=>{
+    const props = e.features[0].properties;
+    toggle(Number(props.id));
+  });
+
+  map.on('mouseenter','clusters',()=>map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','clusters',()=>map.getCanvas().style.cursor='');
+
+}
+
+/* ===== リスト ===== */
+function renderList(){
+  const list = document.getElementById("list");
+  list.innerHTML="";
 
   onsens.forEach((o,i)=>{
-
-    const el = document.createElement("div");
-    el.className = `marker type-${o.type}`;
-    el.innerHTML = "♨";
-
-    const orderIndex = selected.indexOf(i);
-    if(orderIndex !== -1){
-      el.classList.add("selected");
-
-      const num = document.createElement("div");
-      num.className = "marker-number";
-      num.innerText = orderIndex + 1;
-      el.appendChild(num);
-    }
-
-    const marker = new maplibregl.Marker({
-      element: el,
-      anchor: 'bottom'
-    })
-      .setLngLat([o.lng, o.lat])
-      .setPopup(new maplibregl.Popup().setText(o.name))
-      .addTo(map);
-
-    markers.push(marker);
-
-    const div = document.createElement("div");
+    const div=document.createElement("div");
     div.className="card";
     if(selected.includes(i)) div.classList.add("active");
 
-    div.onclick=()=>toggle(i);
     div.innerHTML=`<b>${o.name}</b>`;
+    div.onclick=()=>toggle(i);
 
-    document.getElementById("list").appendChild(div);
+    list.appendChild(div);
   });
 
   renderSelected();
@@ -221,7 +240,7 @@ function toggle(i){
   }else{
     selected.push(i);
   }
-  render();
+  renderList();
 }
 
 /* ===== 並び替え ===== */
@@ -241,7 +260,7 @@ function renderSelected(){
     animation:150,
     onEnd:()=>{
       selected=[...el.children].map(e=>parseInt(e.dataset.id));
-      render();
+      renderList();
     }
   });
 }
