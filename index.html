@@ -81,6 +81,7 @@ const MAPTILER_KEY = "5803br5MI3qRfp9DVSHL";
 let onsens = [];
 let selected = [];
 let map;
+let startFromCurrent = true;
 
 /* ===== CSV読み込み ===== */
 async function loadCSV(){
@@ -137,7 +138,8 @@ function setupSource(){
       },
       properties:{
         id: i,
-        name: o.name
+        name: o.name,
+        type: o.type
       }
     }))
   };
@@ -150,7 +152,18 @@ function setupSource(){
     clusterRadius:50
   });
 
-  /* クラスター円 */
+  /* 色定義 */
+  const typeColor = [
+    'match',
+    ['get','type'],
+    '塩化物泉', '#e74c3c',
+    '炭酸泉', '#3498db',
+    '単純温泉', '#7f8c8d',
+    '含鉄泉', '#d2691e',
+    '#95a5a6'
+  ];
+
+  /* クラスター */
   map.addLayer({
     id:'clusters',
     type:'circle',
@@ -165,7 +178,6 @@ function setupSource(){
     }
   });
 
-  /* クラスター数 */
   map.addLayer({
     id:'cluster-count',
     type:'symbol',
@@ -177,19 +189,47 @@ function setupSource(){
     }
   });
 
-  /* 単体ポイント */
+  /* 通常ポイント */
   map.addLayer({
     id:'unclustered',
     type:'circle',
     source:'onsens',
     filter:['!has','point_count'],
     paint:{
-      'circle-color':'#3498db',
-      'circle-radius':6
+      'circle-color': typeColor,
+      'circle-radius': [
+        'interpolate',['linear'],['zoom'],
+        5,4,
+        10,7,
+        15,10
+      ],
+      'circle-stroke-width': 1,
+      'circle-stroke-color': '#fff'
     }
   });
 
-  /* クラスタクリックでズーム */
+  /* 選択ポイント */
+  map.addLayer({
+    id:'selected-points',
+    type:'circle',
+    source:'onsens',
+    filter:['in','id', -1],
+    paint:{
+      'circle-color':'#000',
+      'circle-radius': [
+        'interpolate',['linear'],['zoom'],
+        5,8,
+        10,12,
+        15,16
+      ],
+      'circle-stroke-width': 3,
+      'circle-stroke-color':'#fff'
+    }
+  });
+
+  map.moveLayer('selected-points');
+
+  /* クラスタクリック */
   map.on('click','clusters', (e)=>{
     const features = map.queryRenderedFeatures(e.point,{layers:['clusters']});
     const clusterId = features[0].properties.cluster_id;
@@ -205,13 +245,19 @@ function setupSource(){
 
   /* 単体クリック */
   map.on('click','unclustered', (e)=>{
-    const props = e.features[0].properties;
-    toggle(Number(props.id));
+    const id = Number(e.features[0].properties.id);
+    toggle(id);
   });
 
-  map.on('mouseenter','clusters',()=>map.getCanvas().style.cursor='pointer');
-  map.on('mouseleave','clusters',()=>map.getCanvas().style.cursor='');
+  map.on('mouseenter','unclustered',()=>map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','unclustered',()=>map.getCanvas().style.cursor='');
+}
 
+/* ===== 選択反映 ===== */
+function updateSelectedLayer(){
+  map.setFilter('selected-points', [
+    'in','id', ...selected
+  ]);
 }
 
 /* ===== リスト ===== */
@@ -240,6 +286,8 @@ function toggle(i){
   }else{
     selected.push(i);
   }
+
+  updateSelectedLayer();
   renderList();
 }
 
@@ -260,6 +308,7 @@ function renderSelected(){
     animation:150,
     onEnd:()=>{
       selected=[...el.children].map(e=>parseInt(e.dataset.id));
+      updateSelectedLayer();
       renderList();
     }
   });
