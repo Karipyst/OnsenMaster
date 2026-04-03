@@ -208,14 +208,14 @@ function setupSource(){
     }
   });
 
-  /* 選択ポイント */
+  /* 選択ポイント（色そのまま＋拡大） */
   map.addLayer({
     id:'selected-points',
     type:'circle',
     source:'onsens',
     filter:['in','id', -1],
     paint:{
-      'circle-color':'#000',
+      'circle-color': typeColor,
       'circle-radius': [
         'interpolate',['linear'],['zoom'],
         5,8,
@@ -227,7 +227,23 @@ function setupSource(){
     }
   });
 
+  /* 選択番号表示 */
+  map.addLayer({
+    id:'selected-label',
+    type:'symbol',
+    source:'onsens',
+    filter:['in','id', -1],
+    layout:{
+      'text-field':['get','order'],
+      'text-size':12
+    },
+    paint:{
+      'text-color':'#fff'
+    }
+  });
+
   map.moveLayer('selected-points');
+  map.moveLayer('selected-label');
 
   /* クラスタクリック */
   map.on('click','clusters', (e)=>{
@@ -249,15 +265,33 @@ function setupSource(){
     toggle(id);
   });
 
-  map.on('mouseenter','unclustered',()=>map.getCanvas().style.cursor='pointer');
-  map.on('mouseleave','unclustered',()=>map.getCanvas().style.cursor='');
 }
 
-/* ===== 選択反映 ===== */
+/* ===== 選択反映（番号付き） ===== */
 function updateSelectedLayer(){
-  map.setFilter('selected-points', [
-    'in','id', ...selected
-  ]);
+
+  // order付与したGeoJSON再生成
+  const geojson = {
+    type: 'FeatureCollection',
+    features: onsens.map((o,i)=>({
+      type:'Feature',
+      geometry:{
+        type:'Point',
+        coordinates:[o.lng, o.lat]
+      },
+      properties:{
+        id: i,
+        name: o.name,
+        type: o.type,
+        order: selected.indexOf(i) >= 0 ? String(selected.indexOf(i)+1) : ''
+      }
+    }))
+  };
+
+  map.getSource('onsens').setData(geojson);
+
+  map.setFilter('selected-points', ['in','id', ...selected]);
+  map.setFilter('selected-label', ['in','id', ...selected]);
 }
 
 /* ===== リスト ===== */
