@@ -14,7 +14,6 @@ body {
   margin:0;
   font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
   background:#f2f2f7;
-  color:#1c1c1e;
 }
 
 #map {
@@ -43,7 +42,6 @@ body {
   border-radius:10px;
 }
 
-/* フッター */
 .footer {
   position:fixed;
   bottom:0;
@@ -70,6 +68,11 @@ body {
   border:none;
   border-radius:12px;
 }
+
+.toggle-btn.active {
+  background:#34c759;
+  color:#fff;
+}
 </style>
 </head>
 
@@ -86,6 +89,7 @@ body {
 
 <div class="footer">
   <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
+  <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">現在地</button>
 </div>
 
 <script>
@@ -95,6 +99,7 @@ const MAPTILER_KEY = "5803br5MI3qRfp9DVSHL";
 let onsens = [];
 let selected = [];
 let map;
+let startFromCurrent = true;
 
 /* ===== 泉質カラー ===== */
 const typeColor = {
@@ -147,7 +152,13 @@ function setup(){
     type:'geojson',
     data:geo(),
     cluster:true,
-    clusterRadius:50
+    clusterRadius:50,
+    clusterProperties:{
+      selectedCount:[
+        "+",
+        ["case", ["in", ["get","id"], ["literal", selected]], 1, 0]
+      ]
+    }
   });
 
   /* クラスタ */
@@ -157,7 +168,12 @@ function setup(){
     source:'onsen',
     filter:['has','point_count'],
     paint:{
-      'circle-color':'#636e72',
+      'circle-color':[
+        'case',
+        ['>', ['get','selectedCount'], 0],
+        '#ff9500',
+        '#636e72'
+      ],
       'circle-radius':18
     }
   });
@@ -171,7 +187,7 @@ function setup(){
     paint:{ 'text-color':'#fff' }
   });
 
-  /* 未選択 */
+  /* 通常ピン */
   map.addLayer({
     id:'points',
     type:'circle',
@@ -185,7 +201,7 @@ function setup(){
     }
   });
 
-  /* 選択 */
+  /* 選択ピン */
   map.addLayer({
     id:'selected',
     type:'circle',
@@ -196,6 +212,21 @@ function setup(){
       'circle-radius':14,
       'circle-stroke-width':3,
       'circle-stroke-color':'#f1c40f'
+    }
+  });
+
+  /* 順番表示 */
+  map.addLayer({
+    id:'order-label',
+    type:'symbol',
+    source:'onsen',
+    filter:['in','id',-1],
+    layout:{
+      'text-field':['get','order'],
+      'text-size':11
+    },
+    paint:{
+      'text-color':'#fff'
     }
   });
 
@@ -240,15 +271,18 @@ function geo(){
       properties:{
         id:i,
         name:o.name,
-        color:typeColor[o.type] || '#7f8c8d'
+        color:typeColor[o.type] || '#7f8c8d',
+        order: selected.includes(i) ? String(selected.indexOf(i)+1) : ""
       }
     }))
   };
 }
 
-/* ===== 更新（軽量） ===== */
+/* ===== 更新 ===== */
 function update(){
+  map.getSource('onsen').setData(geo());
   map.setFilter('selected',['in','id',...selected]);
+  map.setFilter('order-label',['in','id',...selected]);
 }
 
 /* ===== UI ===== */
@@ -282,12 +316,26 @@ function toggle(i){
   renderSelected();
 }
 
-/* ===== ルート ===== */
+/* ===== 現在地トグル ===== */
+function toggleStartMode(){
+  startFromCurrent=!startFromCurrent;
+  document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
+}
+
+/* ===== ルート生成 ===== */
 function generateRoute(){
   if(!selected.length) return;
 
   const names=selected.map(i=>encodeURIComponent(onsens[i].name));
-  const url=`https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${names.at(-1)}&waypoints=${names.slice(0,-1).join('|')}`;
+
+  let url;
+
+  if(startFromCurrent){
+    url=`https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${names.at(-1)}&waypoints=${names.slice(0,-1).join('|')}`;
+  }else{
+    url=`https://www.google.com/maps/dir/?api=1&origin=${names[0]}&destination=${names.at(-1)}&waypoints=${names.slice(1,-1).join('|')}`;
+  }
+
   window.open(url);
 }
 
