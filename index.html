@@ -279,9 +279,15 @@ async function init(){
 /* CSV */
 async function loadCSV(){
   const txt=await (await fetch("onsen.csv")).text();
-  onsens=txt.split(/\n/).slice(1).map((l,i)=>{
-    const c=l.split(",");
-    return {id:i,name:c[0],lat:+c[1],lng:+c[2],type:c[3]};
+  onsens = txt.split(/\n/).slice(1).map((l,i)=>{
+    const c = l.split(",");
+    return {
+      id: i,
+      name: c[0],
+      lat: +c[1],
+      lng: +c[2],
+      type: (c[3] || "").trim()
+    };
   });
 }
 
