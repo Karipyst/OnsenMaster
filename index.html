@@ -12,9 +12,9 @@
 <style>
 body {
   margin:0;
-  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
-  background:#f4f6f8;
-  color:#333;
+  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  background:#f2f2f7;
+  color:#1c1c1e;
 }
 
 /* ===== マップ ===== */
@@ -25,17 +25,18 @@ body {
   height:65vh;
 }
 
-/* ===== メイン ===== */
+/* ===== Apple風カード ===== */
 .main {
   margin-top:65vh;
   padding:12px;
 }
 
 .selected-container {
-  background:#fff;
-  border-radius:14px;
-  padding:12px;
-  box-shadow:0 4px 12px rgba(0,0,0,0.08);
+  backdrop-filter: blur(20px);
+  background:rgba(255,255,255,0.75);
+  border-radius:16px;
+  padding:14px;
+  box-shadow:0 10px 25px rgba(0,0,0,0.08);
 }
 
 .selected-title {
@@ -44,17 +45,11 @@ body {
   margin-bottom:6px;
 }
 
-.selected-list {
-  max-height:30vh;
-  overflow-y:auto;
-}
-
 .selected-item {
   padding:10px;
   margin:6px 0;
-  background:#eef2f6;
+  background:rgba(0,0,0,0.05);
   border-radius:10px;
-  cursor:grab;
   font-size:13px;
 }
 
@@ -63,8 +58,9 @@ body {
   position:fixed;
   bottom:0;
   width:100%;
-  background:#fff;
-  border-top:1px solid #ddd;
+  backdrop-filter: blur(20px);
+  background:rgba(255,255,255,0.75);
+  border-top:1px solid rgba(0,0,0,0.1);
   padding:10px;
   display:flex;
   justify-content:center;
@@ -73,23 +69,21 @@ body {
 
 .route-btn {
   padding:12px 20px;
-  background:#2ecc71;
+  background:#007aff;
   color:#fff;
   border:none;
-  border-radius:10px;
-  font-size:14px;
+  border-radius:12px;
 }
 
 .toggle-btn {
   padding:10px 14px;
-  background:#bdc3c7;
+  background:#d1d1d6;
   border:none;
-  border-radius:10px;
-  font-size:12px;
+  border-radius:12px;
 }
 
 .toggle-btn.active {
-  background:#3498db;
+  background:#34c759;
   color:#fff;
 }
 </style>
@@ -102,7 +96,7 @@ body {
 <div class="main">
   <div class="selected-container">
     <div class="selected-title">選択ルート</div>
-    <div id="selected" class="selected-list"></div>
+    <div id="selected"></div>
   </div>
 </div>
 
@@ -118,29 +112,34 @@ const MAPTILER_KEY = "5803br5MI3qRfp9DVSHL";
 let onsens = [];
 let selected = [];
 let map;
-let startFromCurrent = true;
+
+/* ===== 泉質カラー ===== */
+const typeColorMap = {
+  "塩化物泉":"#e74c3c",
+  "炭酸泉":"#3498db",
+  "単純温泉":"#95a5a6",
+  "含鉄泉":"#d35400"
+};
 
 /* ===== CSV ===== */
 async function loadCSV(){
   const res = await fetch("onsen.csv");
-  let text = await res.text();
-  text = text.replace(/^\uFEFF/, '');
+  const text = await res.text();
   const lines = text.trim().split(/\r?\n/);
 
   onsens = lines.slice(1).map(line=>{
-    const cols = line.split(",");
+    const c = line.split(",");
     return {
-      name: cols[0],
-      lat: Number(cols[1]),
-      lng: Number(cols[2]),
-      type: cols[3]
+      name:c[0],
+      lat:+c[1],
+      lng:+c[2],
+      type:c[3]
     };
   });
 }
 
 /* ===== 初期化 ===== */
 async function initMap(){
-
   await loadCSV();
 
   map = new maplibregl.Map({
@@ -150,10 +149,8 @@ async function initMap(){
     zoom:6
   });
 
-  map.addControl(new maplibregl.NavigationControl());
-
-  map.on('load', () => {
-    setupSource();
+  map.on('load', ()=>{
+    setup();
     renderSelected();
   });
 }
@@ -161,27 +158,29 @@ async function initMap(){
 initMap();
 
 /* ===== Source ===== */
-function setupSource(){
+function setup(){
 
-  map.addSource('onsens', {
+  map.addSource('onsens',{
     type:'geojson',
-    data: makeGeoJSON(),
+    data:geo(),
     cluster:true,
-    clusterMaxZoom:10,
     clusterRadius:50
   });
 
-  /* ===== クラスタ（改善：濃色＋白文字） */
+  /* ===== クラスタ（選択含有で色変更） */
   map.addLayer({
     id:'clusters',
     type:'circle',
     source:'onsens',
     filter:['has','point_count'],
     paint:{
-      'circle-color':'#2c3e50',
-      'circle-radius':['step',['get','point_count'],18,10,22,30,28],
-      'circle-stroke-width':2,
-      'circle-stroke-color':'#fff'
+      'circle-color':[
+        'case',
+        ['>', ['get','selectedCount'], 0],
+        '#ff9500',   // 選択あり
+        '#8e8e93'    // 通常
+      ],
+      'circle-radius':20
     }
   });
 
@@ -191,94 +190,55 @@ function setupSource(){
     source:'onsens',
     filter:['has','point_count'],
     layout:{
-      'text-field':['get','point_count'],
-      'text-size':12
+      'text-field':['get','point_count']
     },
     paint:{ 'text-color':'#fff' }
   });
 
-  /* ===== 未選択 ===== */
+  /* ===== 温泉ピン（♨） ===== */
   map.addLayer({
-    id:'unclustered',
-    type:'circle',
-    source:'onsens',
-    filter:['!has','point_count'],
-    paint:{
-      'circle-color':'#95a5a6',
-      'circle-radius':8,
-      'circle-stroke-width':1,
-      'circle-stroke-color':'#fff'
-    }
-  });
-
-  /* ===== 選択（強調） ===== */
-  map.addLayer({
-    id:'selected',
-    type:'circle',
-    source:'onsens',
-    filter:['in','id',-1],
-    paint:{
-      'circle-color':'#e74c3c',
-      'circle-radius':14,
-      'circle-stroke-width':3,
-      'circle-stroke-color':'#f1c40f'
-    }
-  });
-
-  /* ===== 番号 ===== */
-  map.addLayer({
-    id:'labels',
+    id:'onsen-icon',
     type:'symbol',
     source:'onsens',
-    filter:['in','id',-1],
+    filter:['!has','point_count'],
     layout:{
-      'text-field':['get','order'],
-      'text-size':12
+      'text-field':'♨',
+      'text-size':18
     },
-    paint:{ 'text-color':'#fff' }
+    paint:{
+      'text-color':[
+        'case',
+        ['in',['get','id'],['literal',selected]],
+        '#ff3b30', // 選択
+        ['get','color'] // 泉質
+      ]
+    }
   });
 
-  /* ===== 名前（常時表示） ===== */
+  /* ===== 名前 ===== */
   map.addLayer({
-    id:'name-label',
+    id:'label',
     type:'symbol',
     source:'onsens',
     filter:['!has','point_count'],
     layout:{
       'text-field':['get','name'],
-      'text-size':11,
-      'text-offset':[0,1.2],
-      'text-anchor':'top'
+      'text-size':10,
+      'text-offset':[0,1.2]
     },
     paint:{
-      'text-color':'#2c3e50',
-      'text-halo-color':'#ffffff',
+      'text-halo-color':'#fff',
       'text-halo-width':3
     }
   });
 
-  map.moveLayer('selected');
-  map.moveLayer('labels');
-
-  map.on('click','unclustered', e=>{
-    toggle(Number(e.features[0].properties.id));
-  });
-
-  map.on('click','clusters', e=>{
-    const features = map.queryRenderedFeatures(e.point,{layers:['clusters']});
-    const clusterId = features[0].properties.cluster_id;
-
-    map.getSource('onsens').getClusterExpansionZoom(clusterId,(err,zoom)=>{
-      map.easeTo({
-        center:features[0].geometry.coordinates,
-        zoom
-      });
-    });
+  map.on('click','onsen-icon',e=>{
+    toggle(e.features[0].properties.id);
   });
 }
 
 /* ===== GeoJSON ===== */
-function makeGeoJSON(){
+function geo(){
   return {
     type:'FeatureCollection',
     features: onsens.map((o,i)=>({
@@ -287,7 +247,7 @@ function makeGeoJSON(){
       properties:{
         id:i,
         name:o.name,
-        order: selected.indexOf(i)>=0 ? String(selected.indexOf(i)+1) : ''
+        color:typeColorMap[o.type] || '#7f8c8d'
       }
     }))
   };
@@ -295,9 +255,7 @@ function makeGeoJSON(){
 
 /* ===== 更新 ===== */
 function update(){
-  map.getSource('onsens').setData(makeGeoJSON());
-  map.setFilter('selected',['in','id',...selected]);
-  map.setFilter('labels',['in','id',...selected]);
+  map.getSource('onsens').setData(geo());
 }
 
 /* ===== UI ===== */
@@ -316,42 +274,31 @@ function renderSelected(){
   new Sortable(el,{
     animation:150,
     onEnd:()=>{
-      selected=[...el.children].map(e=>parseInt(e.dataset.id));
+      selected=[...el.children].map(e=>+e.dataset.id);
       update();
     }
   });
 }
 
 function toggle(i){
-  if(selected.includes(i)){
-    selected=selected.filter(x=>x!==i);
-  }else{
-    selected.push(i);
-  }
+  selected.includes(i)
+    ? selected=selected.filter(x=>x!==i)
+    : selected.push(i);
+
   update();
   renderSelected();
 }
 
 /* ===== ボタン ===== */
 function toggleStartMode(){
-  startFromCurrent=!startFromCurrent;
-  document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
+  document.getElementById("toggleStart").classList.toggle("active");
 }
 
 function generateRoute(){
-  if(selected.length<1) return;
+  if(!selected.length) return;
 
-  const route=selected.map(i=>onsens[i]);
-  const names=route.map(o=>encodeURIComponent(o.name));
-
-  let url;
-
-  if(startFromCurrent){
-    url=`https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${names.at(-1)}&waypoints=${names.slice(0,-1).join('|')}`;
-  }else{
-    url=`https://www.google.com/maps/dir/?api=1&origin=${names[0]}&destination=${names.at(-1)}&waypoints=${names.slice(1,-1).join('|')}`;
-  }
-
+  const names=selected.map(i=>encodeURIComponent(onsens[i].name));
+  const url=`https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${names.at(-1)}&waypoints=${names.slice(0,-1).join('|')}`;
   window.open(url);
 }
 
