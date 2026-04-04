@@ -12,21 +12,12 @@
 <style>
 body {
   margin:0;
-  font-family:-apple-system, BlinkMacSystemFont, "SF Pro Text", sans-serif;
+  font-family:-apple-system, BlinkMacSystemFont, sans-serif;
   background:#f2f2f7;
 }
+#map { position:fixed; top:0; width:100%; height:65vh; }
 
-#map {
-  position:fixed;
-  top:0;
-  width:100%;
-  height:65vh;
-}
-
-.main {
-  margin-top:65vh;
-  padding:12px;
-}
+.main { margin-top:65vh; padding:12px; }
 
 .selected-container {
   backdrop-filter: blur(20px);
@@ -89,6 +80,7 @@ body {
 
 <div class="footer">
   <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
+  <button onclick="drawRoute()" class="route-btn">地図に表示</button>
   <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">現在地</button>
 </div>
 
@@ -108,7 +100,6 @@ const typeColor = {
   "含鉄泉":"#d35400"
 };
 
-/* ===== CSV ===== */
 async function loadCSV(){
   const res = await fetch("onsen.csv");
   const text = await res.text();
@@ -116,16 +107,10 @@ async function loadCSV(){
 
   onsens = lines.slice(1).map(line=>{
     const c = line.split(",");
-    return {
-      name:c[0],
-      lat:+c[1],
-      lng:+c[2],
-      type:c[3]
-    };
+    return { name:c[0], lat:+c[1], lng:+c[2], type:c[3] };
   });
 }
 
-/* ===== 初期化 ===== */
 async function init(){
   await loadCSV();
 
@@ -139,31 +124,38 @@ async function init(){
   map.on('load',()=>{
     setup();
     renderSelected();
+
+    /* ルートレイヤー */
+    map.addSource('route',{ type:'geojson', data:{type:'FeatureCollection',features:[]} });
+
+    map.addLayer({
+      id:'route-line',
+      type:'line',
+      source:'route',
+      paint:{
+        'line-color':'#007aff',
+        'line-width':5
+      }
+    });
   });
 }
 
 init();
 
-/* ===== Source ===== */
 function setup(){
 
   map.addSource('onsen',{
     type:'geojson',
     data:geo(),
-    cluster:true,
-    clusterRadius:50
+    cluster:true
   });
 
-  /* クラスタ */
   map.addLayer({
     id:'cluster',
     type:'circle',
     source:'onsen',
     filter:['has','point_count'],
-    paint:{
-      'circle-color':'#636e72',
-      'circle-radius':18
-    }
+    paint:{ 'circle-color':'#636e72','circle-radius':18 }
   });
 
   map.addLayer({
@@ -175,7 +167,6 @@ function setup(){
     paint:{ 'text-color':'#fff' }
   });
 
-  /* 通常 */
   map.addLayer({
     id:'points',
     type:'circle',
@@ -189,7 +180,6 @@ function setup(){
     }
   });
 
-  /* 選択 */
   map.addLayer({
     id:'selected',
     type:'circle',
@@ -203,34 +193,13 @@ function setup(){
     }
   });
 
-  /* 順番 */
   map.addLayer({
     id:'order',
     type:'symbol',
     source:'onsen',
     filter:['in','id',-1],
-    layout:{
-      'text-field':['get','order'],
-      'text-size':11
-    },
+    layout:{ 'text-field':['get','order'], 'text-size':11 },
     paint:{ 'text-color':'#fff' }
-  });
-
-  /* 名前 */
-  map.addLayer({
-    id:'label',
-    type:'symbol',
-    source:'onsen',
-    filter:['!has','point_count'],
-    layout:{
-      'text-field':['get','name'],
-      'text-size':10,
-      'text-offset':[0,1.2]
-    },
-    paint:{
-      'text-halo-color':'#fff',
-      'text-halo-width':2
-    }
   });
 
   map.on('click','points',e=>{
@@ -239,15 +208,12 @@ function setup(){
 
   map.on('click','cluster',e=>{
     const f = map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
-    const id = f.properties.cluster_id;
-
-    map.getSource('onsen').getClusterExpansionZoom(id,(err,zoom)=>{
+    map.getSource('onsen').getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{
       map.easeTo({center:f.geometry.coordinates, zoom});
     });
   });
 }
 
-/* ===== GeoJSON ===== */
 function geo(){
   return {
     type:'FeatureCollection',
@@ -264,12 +230,33 @@ function geo(){
   };
 }
 
-/* ===== 更新（安定版） ===== */
 function update(){
   map.getSource('onsen').setData(geo());
-
   map.setFilter('selected',['in','id',...selected]);
   map.setFilter('order',['in','id',...selected]);
+}
+
+/* ===== ルート描画（OSRM） ===== */
+async function drawRoute(){
+
+  if(selected.length < 2) return;
+
+  const coords = selected.map(i=>{
+    const o = onsens[i];
+    return `${o.lng},${o.lat}`;
+  }).join(';');
+
+  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+
+  const res = await fetch(url);
+  const data = await res.json();
+
+  const route = data.routes[0].geometry;
+
+  map.getSource('route').setData({
+    type:'Feature',
+    geometry:route
+  });
 }
 
 /* ===== UI ===== */
@@ -303,13 +290,11 @@ function toggle(i){
   renderSelected();
 }
 
-/* ===== 現在地 ===== */
 function toggleStartMode(){
   startFromCurrent=!startFromCurrent;
   document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
 }
 
-/* ===== ルート ===== */
 function generateRoute(){
   if(!selected.length) return;
 
