@@ -34,6 +34,7 @@ body {
   border-radius:10px;
 }
 
+/* ===== フッター ===== */
 .footer {
   position:fixed;
   bottom:0;
@@ -42,11 +43,19 @@ body {
   background:rgba(255,255,255,0.75);
   padding:10px;
   display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+/* グループ */
+.btn-group {
+  display:flex;
   justify-content:center;
   gap:8px;
   flex-wrap:wrap;
 }
 
+/* ボタン */
 button {
   padding:10px 14px;
   border:none;
@@ -54,12 +63,17 @@ button {
   font-size:13px;
 }
 
-.route-btn { background:#007aff; color:#fff; }
-.clear-btn { background:#ff3b30; color:#fff; }
-.opt-btn { background:#34c759; color:#fff; }
+/* 役割別カラー */
+.primary { background:#007aff; color:#fff; }
+.secondary { background:#34c759; color:#fff; }
+.danger { background:#ff3b30; color:#fff; }
+.neutral { background:#d1d1d6; }
 
-.toggle-btn { background:#d1d1d6; }
-.toggle-btn.active { background:#34c759; color:#fff; }
+/* トグル */
+.toggle.active {
+  background:#34c759;
+  color:#fff;
+}
 </style>
 </head>
 
@@ -75,11 +89,20 @@ button {
 </div>
 
 <div class="footer">
-  <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
-  <button onclick="drawRoute()" class="route-btn">地図表示</button>
-  <button onclick="optimizeRoute()" class="opt-btn">最適化</button>
-  <button onclick="clearRoute()" class="clear-btn">削除</button>
-  <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">現在地</button>
+
+  <!-- ルート生成系 -->
+  <div class="btn-group">
+    <button id="toggleStart" class="neutral toggle" onclick="toggleStartMode()">現在地</button>
+    <button onclick="generateRoute()" class="primary">GoogleMap</button>
+    <button onclick="drawRoute()" class="primary">地図表示</button>
+  </div>
+
+  <!-- 補助操作 -->
+  <div class="btn-group">
+    <button onclick="optimizeRoute()" class="secondary">最適化</button>
+    <button onclick="clearRoute()" class="danger">削除</button>
+  </div>
+
 </div>
 
 <script>
@@ -89,7 +112,7 @@ const MAPTILER_KEY = "5803br5MI3qRfp9DVSHL";
 let onsens = [];
 let selected = [];
 let map;
-let startFromCurrent = true;
+let startFromCurrent = false; // ★ 初期OFF
 
 const typeColor = {
   "塩化物泉":"#e74c3c",
@@ -187,20 +210,15 @@ function setup(){
     }
   });
 
-  /* ★ 番号表示（前面） */
   map.addLayer({
     id:'order',
     type:'symbol',
     source:'onsen',
     filter:['in','id',-1],
-    layout:{
-      'text-field':['get','order'],
-      'text-size':12
-    },
+    layout:{ 'text-field':['get','order'], 'text-size':12 },
     paint:{ 'text-color':'#fff' }
   });
 
-  /* ラベル */
   map.addLayer({
     id:'label',
     type:'symbol',
@@ -217,7 +235,6 @@ function setup(){
     }
   });
 
-  /* ★ レイヤー順序調整 */
   map.moveLayer('selected');
   map.moveLayer('order');
 
@@ -255,9 +272,8 @@ function update(){
   map.setFilter('order',['in','id',...selected]);
 }
 
-/* ===== 最短ルート（Nearest Neighbor） ===== */
+/* ===== 最適化 → 自動再描画 ===== */
 function optimizeRoute(){
-
   if(selected.length < 2) return;
 
   const remaining = [...selected];
@@ -267,12 +283,14 @@ function optimizeRoute(){
   result.push(current);
 
   while(remaining.length){
-
     let nearestIndex = 0;
     let nearestDist = Infinity;
 
     remaining.forEach((i, idx)=>{
-      const d = distance(onsens[current], onsens[i]);
+      const d = Math.hypot(
+        onsens[current].lat - onsens[i].lat,
+        onsens[current].lng - onsens[i].lng
+      );
       if(d < nearestDist){
         nearestDist = d;
         nearestIndex = idx;
@@ -286,14 +304,10 @@ function optimizeRoute(){
   selected = result;
   update();
   renderSelected();
+
+  drawRoute(); // ★ 自動再描画
 }
 
-/* 距離計算（簡易） */
-function distance(a,b){
-  return Math.hypot(a.lat-b.lat, a.lng-b.lng);
-}
-
-/* ===== ルート描画 ===== */
 async function drawRoute(){
   if(selected.length < 2) return;
 
@@ -302,9 +316,7 @@ async function drawRoute(){
     return `${o.lng},${o.lat}`;
   }).join(';');
 
-  const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
-
-  const res = await fetch(url);
+  const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
   const data = await res.json();
 
   map.getSource('route').setData({
