@@ -15,7 +15,7 @@ body{
   background:#f2f2f7;
 }
 
-/* ===== ローディング ===== */
+/* ローディング */
 #loading{
   position:fixed;inset:0;
   display:flex;justify-content:center;align-items:center;
@@ -31,7 +31,7 @@ body{
 }
 @keyframes spin{to{transform:rotate(360deg);}}
 
-/* ===== 認証 ===== */
+/* 認証 */
 #auth{
   position:fixed;inset:0;
   display:flex;justify-content:center;align-items:center;
@@ -53,7 +53,7 @@ body{
 }
 .auth-card button{background:#34c759;color:#fff;}
 
-/* ===== 本体 ===== */
+/* 本体 */
 #app{
   position:fixed;
   inset:0;
@@ -62,7 +62,7 @@ body{
   transition:opacity .6s ease, transform .6s ease;
 }
 
-/* ===== マップ ===== */
+/* マップ */
 #map{
   position:fixed;
   top:0;
@@ -70,7 +70,7 @@ body{
   height:65vh;
 }
 
-/* ===== PCリスト ===== */
+/* PCリスト */
 .main{
   margin-top:65vh;
   padding:12px;
@@ -100,7 +100,7 @@ body{
   border:none;
 }
 
-/* ===== フッター ===== */
+/* フッター */
 .footer{
   position:fixed;
   bottom:env(safe-area-inset-bottom);
@@ -124,7 +124,7 @@ button{
 .toggle-btn{background:#d1d1d6;}
 .toggle-btn.active{background:#34c759;color:#fff;}
 
-/* ===== モバイル最適化 ===== */
+/* モバイル */
 .mobile #map{
   height:100dvh;
 }
@@ -164,22 +164,37 @@ button{
 
 <script>
 
-/* ===== 判定 ===== */
 const isMobile = window.matchMedia("(pointer: coarse)").matches;
 if(isMobile) document.body.classList.add("mobile");
 
-/* ===== 設定 ===== */
 const PW_HASH="b25zZW4=";
 const MAPTILER_KEY="5803br5MI3qRfp9DVSHL";
 
 let map,onsens=[],selected=[],startFromCurrent=false;
 
-/* ===== 共通 ===== */
 function showLoading(v){
   document.getElementById("loading").classList.toggle("active",v);
 }
 
-/* ===== ログイン ===== */
+/* ★ 追加：fit処理 */
+function fitRoute(coords){
+  if(coords.length<2) return;
+
+  const bounds=new maplibregl.LngLatBounds(coords[0],coords[0]);
+  coords.forEach(c=>bounds.extend(c));
+
+  map.fitBounds(bounds,{
+    padding:{
+      top:40,
+      bottom:isMobile?120:200,
+      left:40,
+      right:40
+    },
+    duration:600
+  });
+}
+
+/* ログイン */
 function login(){
   if(atob(PW_HASH)!==pw.value){alert("違います");return;}
 
@@ -197,7 +212,7 @@ function login(){
   },500);
 }
 
-/* ===== 初期化 ===== */
+/* 初期化 */
 async function init(){
   await loadCSV();
 
@@ -223,7 +238,7 @@ async function init(){
   });
 }
 
-/* ===== CSV ===== */
+/* CSV */
 async function loadCSV(){
   const txt=await (await fetch("onsen.csv")).text();
   onsens=txt.split(/\n/).slice(1).map((l,i)=>{
@@ -232,7 +247,7 @@ async function loadCSV(){
   });
 }
 
-/* ===== 地図 ===== */
+/* 地図 */
 const typeColor={
   "塩化物泉":"#e74c3c",
   "炭酸泉":"#3498db",
@@ -339,7 +354,42 @@ function update(){
   map.setFilter('order',['in','id',...selected]);
 }
 
-/* ===== UI ===== */
+/* ルート */
+async function drawRoute(){
+  if(selected.length<2)return;
+  showLoading(true);
+
+  const coordPairs=selected.map(i=>{
+    const o=onsens[i];
+    return [o.lng,o.lat];
+  });
+
+  fitRoute(coordPairs); // ★ここだけ追加
+
+  const coords=coordPairs.map(c=>c.join(','));
+
+  const data=await (await fetch(`https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson`)).json();
+
+  map.getSource('route').setData({
+    type:'Feature',
+    geometry:data.routes[0].geometry
+  });
+
+  showLoading(false);
+}
+
+/* 最適化 */
+async function optimizeRoute(){
+  if(selected.length<2)return;
+  showLoading(true);
+
+  selected.sort((a,b)=>onsens[a].lat-onsens[b].lat);
+  update();
+
+  await drawRoute();
+}
+
+/* UI */
 function renderSelected(){
   if(isMobile) return;
 
@@ -372,38 +422,15 @@ function toggle(i){
   renderSelected();
 }
 
-/* ===== ルート ===== */
-async function drawRoute(){
-  if(selected.length<2)return;
-  showLoading(true);
-
-  const coords=selected.map(i=>{
-    const o=onsens[i];
-    return `${o.lng},${o.lat}`;
-  });
-
-  const data=await (await fetch(`https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson`)).json();
-
-  map.getSource('route').setData({
-    type:'Feature',
-    geometry:data.routes[0].geometry
-  });
-
-  showLoading(false);
+function clearRoute(){
+  map.getSource('route').setData({type:'FeatureCollection',features:[]});
 }
 
-/* 最適化 */
-async function optimizeRoute(){
-  if(selected.length<2)return;
-  showLoading(true);
-
-  selected.sort((a,b)=>onsens[a].lat-onsens[b].lat);
-  update();
-
-  await drawRoute();
+function toggleStartMode(){
+  startFromCurrent=!startFromCurrent;
+  document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
 }
 
-/* GoogleMap */
 function generateRoute(){
   if(!selected.length)return;
 
@@ -414,16 +441,6 @@ function generateRoute(){
     : `https://www.google.com/maps/dir/?api=1&origin=${names[0]}&destination=${names.at(-1)}&waypoints=${names.slice(1,-1).join('|')}`;
 
   window.open(url);
-}
-
-/* 現在地 */
-function toggleStartMode(){
-  startFromCurrent=!startFromCurrent;
-  document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
-}
-
-function clearRoute(){
-  map.getSource('route').setData({type:'FeatureCollection',features:[]});
 }
 
 </script>
