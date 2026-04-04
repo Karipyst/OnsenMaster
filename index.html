@@ -89,15 +89,6 @@ body{
   margin:6px 0;
   background:#fff;
   border-radius:10px;
-  transition:.25s;
-}
-
-.remove-btn{
-  width:26px;height:26px;
-  border-radius:50%;
-  background:#e5e5ea;
-  display:flex;align-items:center;justify-content:center;
-  border:none;
 }
 
 /* フッター */
@@ -124,12 +115,15 @@ button{
 .toggle-btn{background:#d1d1d6;}
 .toggle-btn.active{background:#34c759;color:#fff;}
 
-/* モバイル */
+/* モバイル最適化 */
 .mobile #map{
   height:100dvh;
 }
 .mobile .main{
   display:none;
+}
+.mobile .footer{
+  padding-bottom:calc(env(safe-area-inset-bottom) + 8px);
 }
 </style>
 </head>
@@ -176,7 +170,29 @@ function showLoading(v){
   document.getElementById("loading").classList.toggle("active",v);
 }
 
-/* ★ 追加：fit処理 */
+/* ★ 追加：全体フィット */
+function fitAllPoints(){
+  if(!onsens.length) return;
+
+  const bounds=new maplibregl.LngLatBounds(
+    [onsens[0].lng,onsens[0].lat],
+    [onsens[0].lng,onsens[0].lat]
+  );
+
+  onsens.forEach(o=>bounds.extend([o.lng,o.lat]));
+
+  map.fitBounds(bounds,{
+    padding:{
+      top:40,
+      bottom:isMobile?120:200,
+      left:40,
+      right:40
+    },
+    duration:0
+  });
+}
+
+/* ★ 既存 */
 function fitRoute(coords){
   if(coords.length<2) return;
 
@@ -220,7 +236,8 @@ async function init(){
     container:'map',
     style:`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
     center:[135.15,34.75],
-    zoom:6
+    zoom:6,
+    pixelRatio:window.devicePixelRatio > 2 ? 2 : window.devicePixelRatio
   });
 
   map.on('load',()=>{
@@ -235,7 +252,13 @@ async function init(){
       source:'route',
       paint:{'line-color':'#007aff','line-width':4}
     });
+
+    /* ★ここが最重要 */
+    fitAllPoints();
   });
+
+  /* ★ 回転・画面サイズ変更対応 */
+  window.addEventListener("resize",()=>map.resize());
 }
 
 /* CSV */
@@ -364,7 +387,7 @@ async function drawRoute(){
     return [o.lng,o.lat];
   });
 
-  fitRoute(coordPairs); // ★ここだけ追加
+  fitRoute(coordPairs);
 
   const coords=coordPairs.map(c=>c.join(','));
 
@@ -401,7 +424,7 @@ function renderSelected(){
     d.className="selected-item";
     d.innerHTML=`
       <span>${onsens[i].name}</span>
-      <button class="remove-btn" onclick="removeItem(${i})">×</button>
+      <button onclick="removeItem(${i})">×</button>
     `;
     el.appendChild(d);
   });
