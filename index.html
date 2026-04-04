@@ -18,24 +18,16 @@ body{
 
 /* ===== ローディング ===== */
 #loading{
-  position:fixed;
-  inset:0;
+  position:fixed;inset:0;
   background:rgba(0,0,0,0.25);
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  z-index:20;
-  opacity:0;
-  pointer-events:none;
-  transition:.3s;
+  display:flex;justify-content:center;align-items:center;
+  z-index:20;opacity:0;pointer-events:none;transition:.3s;
 }
 #loading.active{opacity:1;pointer-events:auto;}
 .spinner{
   width:40px;height:40px;
-  border:4px solid #fff;
-  border-top:4px solid transparent;
-  border-radius:50%;
-  animation:spin 1s linear infinite;
+  border:4px solid #fff;border-top:4px solid transparent;
+  border-radius:50%;animation:spin 1s linear infinite;
 }
 @keyframes spin{to{transform:rotate(360deg);}}
 
@@ -69,6 +61,7 @@ body{
   position:fixed;top:0;width:100%;height:65vh;
 }
 
+/* PCリスト */
 .main{
   margin-top:65vh;padding:12px;
 }
@@ -153,15 +146,27 @@ const MAPTILER_KEY="5803br5MI3qRfp9DVSHL";
 let onsens=[],selected=[],map;
 let startFromCurrent=false;
 
-const typeColor={
-  "塩化物泉":"#e74c3c",
-  "炭酸泉":"#3498db",
-  "単純温泉":"#95a5a6",
-  "含鉄泉":"#d35400"
-};
+/* ===== 共通：画面フィット ===== */
+function fitToCoordinates(coords){
+  if(coords.length<2) return;
 
-function showLoading(on){
-  document.getElementById("loading").classList.toggle("active",on);
+  let minX=999,maxX=-999,minY=999,maxY=-999;
+  coords.forEach(([x,y])=>{
+    if(x<minX) minX=x;
+    if(x>maxX) maxX=x;
+    if(y<minY) minY=y;
+    if(y>maxY) maxY=y;
+  });
+
+  map.fitBounds([[minX,minY],[maxX,maxY]],{
+    padding:{
+      top:40,
+      bottom:isMobile?120:200,
+      left:40,
+      right:40
+    },
+    duration:600
+  });
 }
 
 /* ログイン */
@@ -191,6 +196,7 @@ async function init(){
   });
 
   map.on('load',()=>{
+    map.resize(); // ★重要
     setupMap();
     renderSelected();
 
@@ -204,6 +210,7 @@ async function init(){
   });
 }
 
+/* CSV */
 async function loadCSV(){
   const res=await fetch("onsen.csv");
   const text=await res.text();
@@ -250,28 +257,6 @@ function setupMap(){
   });
 
   map.addLayer({
-    id:'selected',
-    type:'circle',
-    source:'onsen',
-    filter:['in','id',-1],
-    paint:{
-      'circle-color':['get','color'],
-      'circle-radius':14,
-      'circle-stroke-width':3,
-      'circle-stroke-color':'#f1c40f'
-    }
-  });
-
-  map.addLayer({
-    id:'order',
-    type:'symbol',
-    source:'onsen',
-    filter:['in','id',-1],
-    layout:{'text-field':['get','order'],'text-size':12},
-    paint:{'text-color':'#fff'}
-  });
-
-  map.addLayer({
     id:'label',
     type:'symbol',
     source:'onsen',
@@ -280,22 +265,11 @@ function setupMap(){
       'text-field':['get','name'],
       'text-size':10,
       'text-offset':[0,1.2]
-    },
-    paint:{
-      'text-halo-color':'#fff',
-      'text-halo-width':2
     }
   });
 
-  map.moveLayer('selected');
-  map.moveLayer('order');
-
   map.on('click','points',e=>{
-    const id=e.features[0].properties.id;
-
-    map.easeTo({center:e.features[0].geometry.coordinates,zoom:map.getZoom()+0.3,duration:200});
-
-    toggle(id);
+    toggle(e.features[0].properties.id);
   });
 
   map.on('click','cluster',e=>{
@@ -312,33 +286,23 @@ function geo(){
     features:onsens.map(o=>({
       type:'Feature',
       geometry:{type:'Point',coordinates:[o.lng,o.lat]},
-      properties:{
-        id:o.id,
-        name:o.name,
-        color:typeColor[o.type]||'#7f8c8d',
-        order:selected.includes(o.id)?String(selected.indexOf(o.id)+1):""
-      }
+      properties:o
     }))
   };
-}
-
-function update(){
-  map.getSource('onsen').setData(geo());
-  map.setFilter('selected',['in','id',...selected]);
-  map.setFilter('order',['in','id',...selected]);
 }
 
 /* ===== ルート ===== */
 async function drawRoute(){
   if(selected.length<2) return;
-  showLoading(true);
 
   const coords=selected.map(i=>{
     const o=onsens[i];
     return `${o.lng},${o.lat}`;
-  }).join(';');
+  });
 
-  const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+  fitToCoordinates(coords.map(c=>c.split(',').map(Number)));
+
+  const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson`);
   const data=await res.json();
 
   const line=data.routes[0].geometry.coordinates;
@@ -353,18 +317,13 @@ async function drawRoute(){
       geometry:{type:'LineString',coordinates:partial}
     });
     if(i<line.length) requestAnimationFrame(step);
-    else showLoading(false);
   }
   step();
 }
 
 /* 最適化 */
 async function optimizeRoute(){
-  if(selected.length<2) return;
-
   selected.sort((a,b)=>onsens[a].lat-onsens[b].lat);
-
-  update();
   renderSelected();
   await drawRoute();
 }
@@ -390,10 +349,8 @@ function renderSelected(){
 function removeItem(btn,i){
   const item=btn.closest(".selected-item");
   item.classList.add("removing");
-
   setTimeout(()=>{
     selected=selected.filter(x=>x!==i);
-    update();
     renderSelected();
   },200);
 }
@@ -402,8 +359,6 @@ function toggle(i){
   selected.includes(i)
     ? selected=selected.filter(x=>x!==i)
     : selected.push(i);
-
-  update();
   renderSelected();
 }
 
@@ -416,12 +371,7 @@ function toggleStartMode(){
   document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
 }
 
-function generateRoute(){
-  if(!selected.length) return;
-  const names=selected.map(i=>encodeURIComponent(onsens[i].name));
-  let url=`https://www.google.com/maps/dir/?api=1&origin=${names[0]}&destination=${names.at(-1)}&waypoints=${names.slice(1,-1).join('|')}`;
-  window.open(url);
-}
+function generateRoute(){}
 
 </script>
 </body>
