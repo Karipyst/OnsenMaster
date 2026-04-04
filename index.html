@@ -16,17 +16,9 @@ body {
   background:#f2f2f7;
 }
 
-#map {
-  position:fixed;
-  top:0;
-  width:100%;
-  height:65vh;
-}
+#map { position:fixed; top:0; width:100%; height:65vh; }
 
-.main {
-  margin-top:65vh;
-  padding:12px;
-}
+.main { margin-top:65vh; padding:12px; }
 
 .selected-container {
   backdrop-filter: blur(20px);
@@ -51,37 +43,23 @@ body {
   padding:10px;
   display:flex;
   justify-content:center;
-  gap:10px;
+  gap:8px;
   flex-wrap:wrap;
 }
 
-.route-btn {
-  padding:12px 18px;
-  background:#007aff;
-  color:#fff;
+button {
+  padding:10px 14px;
   border:none;
   border-radius:12px;
+  font-size:13px;
 }
 
-.clear-btn {
-  padding:12px 18px;
-  background:#ff3b30;
-  color:#fff;
-  border:none;
-  border-radius:12px;
-}
+.route-btn { background:#007aff; color:#fff; }
+.clear-btn { background:#ff3b30; color:#fff; }
+.opt-btn { background:#34c759; color:#fff; }
 
-.toggle-btn {
-  padding:10px;
-  background:#d1d1d6;
-  border:none;
-  border-radius:12px;
-}
-
-.toggle-btn.active {
-  background:#34c759;
-  color:#fff;
-}
+.toggle-btn { background:#d1d1d6; }
+.toggle-btn.active { background:#34c759; color:#fff; }
 </style>
 </head>
 
@@ -98,8 +76,9 @@ body {
 
 <div class="footer">
   <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
-  <button onclick="drawRoute()" class="route-btn">地図に表示</button>
-  <button onclick="clearRoute()" class="clear-btn">ルート削除</button>
+  <button onclick="drawRoute()" class="route-btn">地図表示</button>
+  <button onclick="optimizeRoute()" class="opt-btn">最適化</button>
+  <button onclick="clearRoute()" class="clear-btn">削除</button>
   <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">現在地</button>
 </div>
 
@@ -150,10 +129,7 @@ async function init(){
       id:'route-line',
       type:'line',
       source:'route',
-      paint:{
-        'line-color':'#007aff',
-        'line-width':3
-      }
+      paint:{ 'line-color':'#007aff','line-width':3 }
     });
   });
 }
@@ -211,16 +187,20 @@ function setup(){
     }
   });
 
+  /* ★ 番号表示（前面） */
   map.addLayer({
     id:'order',
     type:'symbol',
     source:'onsen',
     filter:['in','id',-1],
-    layout:{ 'text-field':['get','order'], 'text-size':11 },
+    layout:{
+      'text-field':['get','order'],
+      'text-size':12
+    },
     paint:{ 'text-color':'#fff' }
   });
 
-  /* ★ 温泉名ラベル復活 */
+  /* ラベル */
   map.addLayer({
     id:'label',
     type:'symbol',
@@ -232,11 +212,14 @@ function setup(){
       'text-offset':[0,1.2]
     },
     paint:{
-      'text-color':'#111',
       'text-halo-color':'#fff',
       'text-halo-width':2
     }
   });
+
+  /* ★ レイヤー順序調整 */
+  map.moveLayer('selected');
+  map.moveLayer('order');
 
   map.on('click','points',e=>{
     toggle(e.features[0].properties.id);
@@ -272,6 +255,44 @@ function update(){
   map.setFilter('order',['in','id',...selected]);
 }
 
+/* ===== 最短ルート（Nearest Neighbor） ===== */
+function optimizeRoute(){
+
+  if(selected.length < 2) return;
+
+  const remaining = [...selected];
+  const result = [];
+
+  let current = remaining.shift();
+  result.push(current);
+
+  while(remaining.length){
+
+    let nearestIndex = 0;
+    let nearestDist = Infinity;
+
+    remaining.forEach((i, idx)=>{
+      const d = distance(onsens[current], onsens[i]);
+      if(d < nearestDist){
+        nearestDist = d;
+        nearestIndex = idx;
+      }
+    });
+
+    current = remaining.splice(nearestIndex,1)[0];
+    result.push(current);
+  }
+
+  selected = result;
+  update();
+  renderSelected();
+}
+
+/* 距離計算（簡易） */
+function distance(a,b){
+  return Math.hypot(a.lat-b.lat, a.lng-b.lng);
+}
+
 /* ===== ルート描画 ===== */
 async function drawRoute(){
   if(selected.length < 2) return;
@@ -292,7 +313,6 @@ async function drawRoute(){
   });
 }
 
-/* ===== ルート削除 ===== */
 function clearRoute(){
   map.getSource('route').setData({
     type:'FeatureCollection',
@@ -300,7 +320,6 @@ function clearRoute(){
   });
 }
 
-/* ===== UI ===== */
 function renderSelected(){
   const el=document.getElementById("selected");
   el.innerHTML="";
