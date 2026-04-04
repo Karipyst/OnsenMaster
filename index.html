@@ -15,9 +15,18 @@ body {
   font-family:-apple-system, BlinkMacSystemFont, sans-serif;
   background:#f2f2f7;
 }
-#map { position:fixed; top:0; width:100%; height:65vh; }
 
-.main { margin-top:65vh; padding:12px; }
+#map {
+  position:fixed;
+  top:0;
+  width:100%;
+  height:65vh;
+}
+
+.main {
+  margin-top:65vh;
+  padding:12px;
+}
 
 .selected-container {
   backdrop-filter: blur(20px);
@@ -43,11 +52,20 @@ body {
   display:flex;
   justify-content:center;
   gap:10px;
+  flex-wrap:wrap;
 }
 
 .route-btn {
-  padding:12px 20px;
+  padding:12px 18px;
   background:#007aff;
+  color:#fff;
+  border:none;
+  border-radius:12px;
+}
+
+.clear-btn {
+  padding:12px 18px;
+  background:#ff3b30;
   color:#fff;
   border:none;
   border-radius:12px;
@@ -81,6 +99,7 @@ body {
 <div class="footer">
   <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
   <button onclick="drawRoute()" class="route-btn">地図に表示</button>
+  <button onclick="clearRoute()" class="clear-btn">ルート削除</button>
   <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">現在地</button>
 </div>
 
@@ -125,7 +144,6 @@ async function init(){
     setup();
     renderSelected();
 
-    /* ルートレイヤー */
     map.addSource('route',{ type:'geojson', data:{type:'FeatureCollection',features:[]} });
 
     map.addLayer({
@@ -134,7 +152,7 @@ async function init(){
       source:'route',
       paint:{
         'line-color':'#007aff',
-        'line-width':5
+        'line-width':3
       }
     });
   });
@@ -202,6 +220,24 @@ function setup(){
     paint:{ 'text-color':'#fff' }
   });
 
+  /* ★ 温泉名ラベル復活 */
+  map.addLayer({
+    id:'label',
+    type:'symbol',
+    source:'onsen',
+    filter:['!has','point_count'],
+    layout:{
+      'text-field':['get','name'],
+      'text-size':10,
+      'text-offset':[0,1.2]
+    },
+    paint:{
+      'text-color':'#111',
+      'text-halo-color':'#fff',
+      'text-halo-width':2
+    }
+  });
+
   map.on('click','points',e=>{
     toggle(e.features[0].properties.id);
   });
@@ -236,9 +272,8 @@ function update(){
   map.setFilter('order',['in','id',...selected]);
 }
 
-/* ===== ルート描画（OSRM） ===== */
+/* ===== ルート描画 ===== */
 async function drawRoute(){
-
   if(selected.length < 2) return;
 
   const coords = selected.map(i=>{
@@ -251,11 +286,17 @@ async function drawRoute(){
   const res = await fetch(url);
   const data = await res.json();
 
-  const route = data.routes[0].geometry;
-
   map.getSource('route').setData({
     type:'Feature',
-    geometry:route
+    geometry:data.routes[0].geometry
+  });
+}
+
+/* ===== ルート削除 ===== */
+function clearRoute(){
+  map.getSource('route').setData({
+    type:'FeatureCollection',
+    features:[]
   });
 }
 
