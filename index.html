@@ -16,9 +16,17 @@ body {
   background:#f2f2f7;
 }
 
-#map { position:fixed; top:0; width:100%; height:65vh; }
+#map {
+  position:fixed;
+  top:0;
+  width:100%;
+  height:65vh;
+}
 
-.main { margin-top:65vh; padding:12px; }
+.main {
+  margin-top:65vh;
+  padding:12px;
+}
 
 .selected-container {
   backdrop-filter: blur(20px);
@@ -34,7 +42,7 @@ body {
   border-radius:10px;
 }
 
-/* ===== フッター ===== */
+/* ===== フッター（1段） ===== */
 .footer {
   position:fixed;
   bottom:0;
@@ -43,16 +51,22 @@ body {
   background:rgba(255,255,255,0.75);
   padding:10px;
   display:flex;
-  flex-direction:column;
-  gap:8px;
+  justify-content:space-between;
+  align-items:center;
 }
 
-/* グループ */
-.btn-group {
+/* 中央ボタン群 */
+.center-group {
   display:flex;
-  justify-content:center;
   gap:8px;
-  flex-wrap:wrap;
+  margin:0 auto;
+}
+
+/* 右ボタン群 */
+.right-group {
+  display:flex;
+  gap:8px;
+  margin-right:10px;
 }
 
 /* ボタン */
@@ -61,18 +75,33 @@ button {
   border:none;
   border-radius:12px;
   font-size:13px;
+  transition:transform 0.15s ease, opacity 0.2s;
 }
 
-/* 役割別カラー */
+/* 押下アニメ */
+button:active {
+  transform:scale(0.9);
+}
+
+/* 色 */
 .primary { background:#007aff; color:#fff; }
 .secondary { background:#34c759; color:#fff; }
 .danger { background:#ff3b30; color:#fff; }
 .neutral { background:#d1d1d6; }
 
-/* トグル */
 .toggle.active {
   background:#34c759;
   color:#fff;
+}
+
+/* ルートフェード */
+.route-fade {
+  animation:fadeIn 0.4s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity:0; }
+  to { opacity:1; }
 }
 </style>
 </head>
@@ -90,17 +119,17 @@ button {
 
 <div class="footer">
 
-  <!-- ルート生成系 -->
-  <div class="btn-group">
-    <button id="toggleStart" class="neutral toggle" onclick="toggleStartMode()">現在地</button>
-    <button onclick="generateRoute()" class="primary">GoogleMap</button>
+  <!-- 中央 -->
+  <div class="center-group">
     <button onclick="drawRoute()" class="primary">地図表示</button>
-  </div>
-
-  <!-- 補助操作 -->
-  <div class="btn-group">
     <button onclick="optimizeRoute()" class="secondary">最適化</button>
     <button onclick="clearRoute()" class="danger">削除</button>
+  </div>
+
+  <!-- 右 -->
+  <div class="right-group">
+    <button onclick="generateRoute()" class="primary">GoogleMap</button>
+    <button id="toggleStart" class="neutral toggle" onclick="toggleStartMode()">現在地</button>
   </div>
 
 </div>
@@ -112,7 +141,7 @@ const MAPTILER_KEY = "5803br5MI3qRfp9DVSHL";
 let onsens = [];
 let selected = [];
 let map;
-let startFromCurrent = false; // ★ 初期OFF
+let startFromCurrent = false;
 
 const typeColor = {
   "塩化物泉":"#e74c3c",
@@ -152,7 +181,11 @@ async function init(){
       id:'route-line',
       type:'line',
       source:'route',
-      paint:{ 'line-color':'#007aff','line-width':3 }
+      paint:{
+        'line-color':'#007aff',
+        'line-width':3,
+        'line-opacity':0.9
+      }
     });
   });
 }
@@ -176,24 +209,13 @@ function setup(){
   });
 
   map.addLayer({
-    id:'cluster-count',
-    type:'symbol',
-    source:'onsen',
-    filter:['has','point_count'],
-    layout:{ 'text-field':['get','point_count'] },
-    paint:{ 'text-color':'#fff' }
-  });
-
-  map.addLayer({
     id:'points',
     type:'circle',
     source:'onsen',
     filter:['!has','point_count'],
     paint:{
       'circle-color':['get','color'],
-      'circle-radius':8,
-      'circle-stroke-width':1,
-      'circle-stroke-color':'#fff'
+      'circle-radius':8
     }
   });
 
@@ -235,18 +257,8 @@ function setup(){
     }
   });
 
-  map.moveLayer('selected');
-  map.moveLayer('order');
-
   map.on('click','points',e=>{
     toggle(e.features[0].properties.id);
-  });
-
-  map.on('click','cluster',e=>{
-    const f = map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
-    map.getSource('onsen').getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{
-      map.easeTo({center:f.geometry.coordinates, zoom});
-    });
   });
 }
 
@@ -272,9 +284,11 @@ function update(){
   map.setFilter('order',['in','id',...selected]);
 }
 
-/* ===== 最適化 → 自動再描画 ===== */
+/* ===== 最適化 ===== */
 function optimizeRoute(){
   if(selected.length < 2) return;
+
+  document.body.style.opacity = 0.85;
 
   const remaining = [...selected];
   const result = [];
@@ -302,10 +316,12 @@ function optimizeRoute(){
   }
 
   selected = result;
+
   update();
   renderSelected();
+  drawRoute();
 
-  drawRoute(); // ★ 自動再描画
+  setTimeout(()=>document.body.style.opacity = 1,200);
 }
 
 async function drawRoute(){
