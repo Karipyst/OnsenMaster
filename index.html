@@ -25,6 +25,7 @@ body{
   align-items:center;
   background:linear-gradient(135deg,#0f172a,#1e293b);
   z-index:10;
+  transition:all .6s ease;
 }
 
 .auth-card{
@@ -34,21 +35,21 @@ body{
   border-radius:20px;
   width:260px;
   text-align:center;
+  transform:scale(1);
+  transition:.4s;
 }
 
 .auth-title{
   color:#fff;
   margin-bottom:12px;
-  font-weight:600;
 }
 
 .auth-card input,
 .auth-card button{
   width:100%;
-  box-sizing:border-box;
   padding:12px;
-  border-radius:10px;
   border:none;
+  border-radius:10px;
   margin-bottom:10px;
 }
 
@@ -62,7 +63,8 @@ body{
   position:fixed;
   inset:0;
   opacity:0;
-  transition:.5s;
+  transform:translateY(20px);
+  transition:.6s ease;
 }
 
 #map{
@@ -72,17 +74,10 @@ body{
   height:65vh;
 }
 
-/* PC用リスト */
+/* PCリスト */
 .main{
   margin-top:65vh;
   padding:12px;
-  background:#f2f2f7;
-}
-
-.selected-container{
-  background:#f2f2f7;
-  border-radius:16px;
-  padding:14px;
 }
 
 #selected{
@@ -96,21 +91,26 @@ body{
   align-items:center;
   padding:10px;
   margin:6px 0;
-  background:rgba(0,0,0,0.05);
+  background:#fff;
   border-radius:10px;
 }
 
+/* ★ Apple削除ボタン */
 .remove-btn{
   width:26px;
   height:26px;
   border-radius:50%;
   background:#e5e5ea;
-  color:#555;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   border:none;
-  font-size:16px;
+}
+.remove-btn span{
+  transform:translateY(-1px);
 }
 
-/* ===== フッター ===== */
+/* フッター */
 .footer{
   position:fixed;
   bottom:env(safe-area-inset-bottom);
@@ -121,7 +121,6 @@ body{
   display:flex;
   justify-content:center;
   gap:8px;
-  flex-wrap:wrap;
 }
 
 button{
@@ -137,13 +136,10 @@ button{
 .toggle-btn{ background:#d1d1d6;}
 .toggle-btn.active{ background:#34c759;color:#fff;}
 
-/* ===== モバイル ===== */
-.mobile #map{
-  height:100vh;
-}
-.mobile .main{
-  display:none;
-}
+/* モバイル */
+.mobile #map{ height:100vh; }
+.mobile .main{ display:none; }
+
 </style>
 </head>
 
@@ -161,10 +157,7 @@ button{
   <div id="map"></div>
 
   <div class="main">
-    <div class="selected-container">
-      <div>選択ルート</div>
-      <div id="selected"></div>
-    </div>
+    <div id="selected"></div>
   </div>
 
   <div class="footer">
@@ -178,11 +171,9 @@ button{
 
 <script>
 
-/* ===== モバイル判定 ===== */
 const isMobile = window.matchMedia("(pointer: coarse)").matches;
 if(isMobile) document.body.classList.add("mobile");
 
-/* パスワード */
 const PW_HASH="b25zZW4=";
 const decode=s=>atob(s);
 
@@ -204,12 +195,21 @@ function login(){
     return;
   }
 
-  document.getElementById("auth").style.display="none";
-  document.getElementById("app").style.opacity=1;
-  init();
+  const auth=document.getElementById("auth");
+  const app=document.getElementById("app");
+
+  auth.style.opacity=0;
+  auth.style.transform="scale(1.05)";
+
+  setTimeout(()=>{
+    auth.style.display="none";
+    app.style.opacity=1;
+    app.style.transform="translateY(0)";
+    init();
+  },400);
 }
 
-/* ===== 初期化 ===== */
+/* 初期化 */
 async function init(){
   await loadCSV();
 
@@ -234,7 +234,6 @@ async function init(){
   });
 }
 
-/* CSV */
 async function loadCSV(){
   const res=await fetch("onsen.csv");
   const text=await res.text();
@@ -246,7 +245,7 @@ async function loadCSV(){
   });
 }
 
-/* ===== 地図 ===== */
+/* 地図 */
 function setup(){
   map.addSource('onsen',{type:'geojson',data:geo(),cluster:true});
 
@@ -280,7 +279,34 @@ function setup(){
     }
   });
 
-  /* ★ ラベル復活 */
+  /* ★ 選択強調 */
+  map.addLayer({
+    id:'selected',
+    type:'circle',
+    source:'onsen',
+    filter:['in','id',-1],
+    paint:{
+      'circle-color':['get','color'],
+      'circle-radius':14,
+      'circle-stroke-width':3,
+      'circle-stroke-color':'#f1c40f'
+    }
+  });
+
+  /* ★ 番号 */
+  map.addLayer({
+    id:'order',
+    type:'symbol',
+    source:'onsen',
+    filter:['in','id',-1],
+    layout:{
+      'text-field':['get','order'],
+      'text-size':12
+    },
+    paint:{'text-color':'#fff'}
+  });
+
+  /* ラベル */
   map.addLayer({
     id:'label',
     type:'symbol',
@@ -297,11 +323,13 @@ function setup(){
     }
   });
 
+  map.moveLayer('selected');
+  map.moveLayer('order');
+
   map.on('click','points',e=>{
     toggle(e.features[0].properties.id);
   });
 
-  /* ★ クラスタズーム復活 */
   map.on('click','cluster',e=>{
     const f=map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
     map.getSource('onsen').getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{
@@ -319,13 +347,20 @@ function geo(){
       properties:{
         id:i,
         name:o.name,
-        color:typeColor[o.type]||'#7f8c8d'
+        color:typeColor[o.type]||'#7f8c8d',
+        order:selected.includes(i)?String(selected.indexOf(i)+1):""
       }
     }))
   };
 }
 
-/* ===== ルート ===== */
+function update(){
+  map.getSource('onsen').setData(geo());
+  map.setFilter('selected',['in','id',...selected]);
+  map.setFilter('order',['in','id',...selected]);
+}
+
+/* ★ ルートアニメーション */
 async function drawRoute(){
   if(selected.length<2) return;
 
@@ -334,26 +369,41 @@ async function drawRoute(){
     return `${o.lng},${o.lat}`;
   }).join(';');
 
-  const url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
-  const res=await fetch(url);
+  const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
   const data=await res.json();
 
-  map.getSource('route').setData({
-    type:'Feature',
-    geometry:data.routes[0].geometry
-  });
+  const line=data.routes[0].geometry.coordinates;
+
+  let i=0;
+  const partial=[];
+
+  function step(){
+    for(let j=0;j<25 && i<line.length;j++,i++){
+      partial.push(line[i]);
+    }
+
+    map.getSource('route').setData({
+      type:'Feature',
+      geometry:{type:'LineString',coordinates:partial}
+    });
+
+    if(i<line.length) requestAnimationFrame(step);
+  }
+  step();
 }
 
-/* ===== 最適化 ===== */
+/* 最適化 */
 async function optimizeRoute(){
   if(selected.length<2) return;
 
   selected.sort((a,b)=>onsens[a].lat-onsens[b].lat);
+
+  update();
   renderSelected();
   await drawRoute();
 }
 
-/* ===== UI ===== */
+/* UI */
 function renderSelected(){
   if(isMobile) return;
 
@@ -365,7 +415,7 @@ function renderSelected(){
     d.className="selected-item";
     d.innerHTML=`
       <span>${onsens[i].name}</span>
-      <button class="remove-btn" onclick="removeItem(${i})">×</button>
+      <button class="remove-btn" onclick="removeItem(${i})"><span>×</span></button>
     `;
     el.appendChild(d);
   });
@@ -373,6 +423,7 @@ function renderSelected(){
 
 function removeItem(i){
   selected=selected.filter(x=>x!==i);
+  update();
   renderSelected();
 }
 
@@ -381,6 +432,7 @@ function toggle(i){
     ? selected=selected.filter(x=>x!==i)
     : selected.push(i);
 
+  update();
   renderSelected();
 }
 
@@ -404,6 +456,7 @@ function generateRoute(){
 
   window.open(url);
 }
+
 </script>
 </body>
 </html>
