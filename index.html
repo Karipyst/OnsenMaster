@@ -25,7 +25,6 @@ body{
   align-items:center;
   background:linear-gradient(135deg,#0f172a,#1e293b);
   z-index:10;
-  transition:.6s;
 }
 
 .auth-card{
@@ -45,7 +44,6 @@ body{
   border-radius:10px;
   border:none;
   margin-bottom:10px;
-  font-size:14px;
 }
 
 .auth-card button{
@@ -58,10 +56,10 @@ body{
   position:fixed;
   inset:0;
   opacity:0;
-  transform:translateY(20px);
   transition:.6s;
 }
 
+/* マップ */
 #map{
   position:fixed;
   top:0;
@@ -69,21 +67,26 @@ body{
   height:65vh;
 }
 
+/* PC用リスト */
 .main{
   margin-top:65vh;
   padding:12px;
   background:#f2f2f7;
-  min-height:35vh;
 }
 
 .selected-container{
-  backdrop-filter:blur(20px);
   background:#f2f2f7;
   border-radius:16px;
   padding:14px;
-  min-height:80px;
 }
 
+/* ★ スクロール対応 */
+#selected{
+  max-height:200px;
+  overflow-y:auto;
+}
+
+/* アイテム */
 .selected-item{
   display:flex;
   justify-content:space-between;
@@ -92,17 +95,24 @@ body{
   margin:6px 0;
   background:rgba(0,0,0,0.05);
   border-radius:10px;
-  touch-action:none; /* ★ iOSドラッグ安定 */
 }
 
+/* ★ Apple風削除ボタン */
 .remove-btn{
-  background:#ff3b30;
-  color:#fff;
-  border:none;
+  width:26px;
+  height:26px;
   border-radius:50%;
-  width:24px;
-  height:24px;
-  font-size:14px;
+  background:#e5e5ea;
+  color:#555;
+  border:none;
+  font-size:16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transition:.2s;
+}
+.remove-btn:active{
+  background:#d1d1d6;
 }
 
 /* フッター */
@@ -123,7 +133,6 @@ button{
   padding:10px 14px;
   border:none;
   border-radius:12px;
-  font-size:13px;
 }
 
 .route-btn{ background:#007aff;color:#fff;}
@@ -132,6 +141,14 @@ button{
 
 .toggle-btn{ background:#d1d1d6;}
 .toggle-btn.active{ background:#34c759;color:#fff;}
+
+/* ===== モバイル ===== */
+.mobile #map{
+  height:100vh;
+}
+.mobile .main{
+  display:none;
+}
 </style>
 </head>
 
@@ -139,7 +156,6 @@ button{
 
 <div id="auth">
   <div class="auth-card">
-    <h3 style="color:white;">温泉マップ</h3>
     <input type="password" id="pw" placeholder="パスワード">
     <button onclick="login()">ログイン</button>
   </div>
@@ -166,14 +182,20 @@ button{
 
 <script>
 
-/* パスワード隠し */
+/* ===== モバイル判定 ===== */
+const isMobile = window.matchMedia("(pointer: coarse)").matches;
+if(isMobile){
+  document.body.classList.add("mobile");
+}
+
+/* パスワード */
 const PW_HASH="b25zZW4=";
 const decode=s=>atob(s);
 
 const MAPTILER_KEY="5803br5MI3qRfp9DVSHL";
 
 let onsens=[],selected=[],map;
-let startFromCurrent=false; // ★ 初期OFF
+let startFromCurrent=false;
 
 const typeColor={
   "塩化物泉":"#e74c3c",
@@ -188,14 +210,9 @@ function login(){
     return;
   }
 
-  document.getElementById("auth").style.opacity=0;
-
-  setTimeout(()=>{
-    document.getElementById("auth").style.display="none";
-    document.getElementById("app").style.opacity=1;
-    document.getElementById("app").style.transform="translateY(0)";
-    init();
-  },400);
+  document.getElementById("auth").style.display="none";
+  document.getElementById("app").style.opacity=1;
+  init();
 }
 
 async function init(){
@@ -211,18 +228,9 @@ async function init(){
   map.on('load',()=>{
     setup();
     renderSelected();
-
-    map.addSource('route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-    map.addLayer({
-      id:'route-line',
-      type:'line',
-      source:'route',
-      paint:{'line-color':'#007aff','line-width':4}
-    });
   });
 }
 
-/* CSV */
 async function loadCSV(){
   const res=await fetch("onsen.csv");
   const text=await res.text();
@@ -234,7 +242,7 @@ async function loadCSV(){
   });
 }
 
-/* 地図 */
+/* ===== 地図 ===== */
 function setup(){
   map.addSource('onsen',{type:'geojson',data:geo(),cluster:true});
 
@@ -268,56 +276,8 @@ function setup(){
     }
   });
 
-  map.addLayer({
-    id:'selected',
-    type:'circle',
-    source:'onsen',
-    filter:['in','id',-1],
-    paint:{
-      'circle-color':['get','color'],
-      'circle-radius':14,
-      'circle-stroke-width':3,
-      'circle-stroke-color':'#f1c40f'
-    }
-  });
-
-  map.addLayer({
-    id:'order',
-    type:'symbol',
-    source:'onsen',
-    filter:['in','id',-1],
-    layout:{'text-field':['get','order'],'text-size':12},
-    paint:{'text-color':'#fff'}
-  });
-
-  map.addLayer({
-    id:'label',
-    type:'symbol',
-    source:'onsen',
-    filter:['!has','point_count'],
-    layout:{
-      'text-field':['get','name'],
-      'text-size':10,
-      'text-offset':[0,1.2]
-    },
-    paint:{
-      'text-halo-color':'#fff',
-      'text-halo-width':2
-    }
-  });
-
-  map.moveLayer('selected');
-  map.moveLayer('order');
-
   map.on('click','points',e=>{
     toggle(e.features[0].properties.id);
-  });
-
-  map.on('click','cluster',e=>{
-    const f=map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
-    map.getSource('onsen').getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{
-      map.easeTo({center:f.geometry.coordinates,zoom});
-    });
   });
 }
 
@@ -330,53 +290,39 @@ function geo(){
       properties:{
         id:i,
         name:o.name,
-        color:typeColor[o.type]||'#7f8c8d',
-        order:selected.includes(i)?String(selected.indexOf(i)+1):""
+        color:typeColor[o.type]||'#7f8c8d'
       }
     }))
   };
 }
 
-function update(){
-  map.getSource('onsen').setData(geo());
-  map.setFilter('selected',['in','id',...selected]);
-  map.setFilter('order',['in','id',...selected]);
-}
-
 /* ===== UI ===== */
 function renderSelected(){
+  if(isMobile) return;
+
   const el=document.getElementById("selected");
   el.innerHTML="";
 
   selected.forEach(i=>{
     const d=document.createElement("div");
     d.className="selected-item";
-    d.dataset.id=i;
-
     d.innerHTML=`
       <span>${onsens[i].name}</span>
       <button class="remove-btn" onclick="removeItem(${i})">×</button>
     `;
-
     el.appendChild(d);
   });
 
   new Sortable(el,{
     animation:150,
-    delay:150,
-    delayOnTouchOnly:true,
-    touchStartThreshold:5,
-    fallbackOnBody:true,
     onEnd:()=>{
-      selected=[...el.children].map(e=>+e.dataset.id);
-      update();
+      selected=[...el.children].map((_,idx)=>selected[idx]);
     }
   });
 }
 
 function removeItem(i){
   selected=selected.filter(x=>x!==i);
-  update();
   renderSelected();
 }
 
@@ -384,15 +330,11 @@ function toggle(i){
   selected.includes(i)
     ? selected=selected.filter(x=>x!==i)
     : selected.push(i);
-  update();
+
   renderSelected();
 }
 
 /* ===== その他 ===== */
-function clearRoute(){
-  map.getSource('route').setData({type:'FeatureCollection',features:[]});
-}
-
 function toggleStartMode(){
   startFromCurrent=!startFromCurrent;
   document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
