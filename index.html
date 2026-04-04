@@ -33,25 +33,40 @@ body{
 
 /* 認証 */
 #auth{
-  position:fixed;inset:0;
-  display:flex;justify-content:center;align-items:center;
+  position:fixed;
+  inset:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
   background:linear-gradient(135deg,#0f172a,#1e293b);
   z-index:10;
-  transition:opacity .6s ease, transform .6s ease;
+  transition:.6s;
 }
+
 .auth-card{
   backdrop-filter:blur(20px);
   background:rgba(255,255,255,0.1);
-  padding:30px;border-radius:20px;
-  width:260px;text-align:center;
-  transition:.5s;
+  padding:30px;
+  border-radius:20px;
+  width:260px;
+  text-align:center;
 }
-.auth-title{color:#fff;margin-bottom:12px;}
 
-.auth-card input,.auth-card button{
-  width:100%;padding:12px;border:none;border-radius:10px;margin-bottom:10px;
+.auth-card input,
+.auth-card button{
+  width:100%;
+  box-sizing:border-box;
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  margin-bottom:10px;
+  font-size:14px;
 }
-.auth-card button{background:#34c759;color:#fff;}
+
+.auth-card button{
+  background:#34c759;
+  color:#fff;
+}
 
 /* 本体 */
 #app{
@@ -140,7 +155,7 @@ button{
 
 <div id="auth">
   <div class="auth-card">
-    <div class="auth-title">温泉マップ</div>
+    <h3 style="color:white;">温泉マップ</h3>
     <input type="password" id="pw">
     <button onclick="login()">ログイン</button>
   </div>
