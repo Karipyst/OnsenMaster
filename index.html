@@ -34,11 +34,17 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   padding:10px;
 }
 
+/* タイトル固定 */
 .selected-title {
   font-weight:bold;
-  margin-bottom:5px;
+  position:sticky;
+  top:0;
+  background:#fff;
+  padding-bottom:5px;
+  z-index:1;
 }
 
+/* リストのみスクロール */
 .selected-list {
   max-height:30vh;
   overflow-y:auto;
@@ -176,7 +182,7 @@ function setupSource(){
     '#95a5a6'
   ];
 
-  /* ===== クラスタ（肌色） ===== */
+  /* クラスタ */
   map.addLayer({
     id:'clusters',
     type:'circle',
@@ -197,12 +203,10 @@ function setupSource(){
       'text-field':['get','point_count'],
       'text-size':12
     },
-    paint:{
-      'text-color':'#000'
-    }
+    paint:{ 'text-color':'#000' }
   });
 
-  /* ===== 単体 ===== */
+  /* 単体 */
   map.addLayer({
     id:'unclustered',
     type:'circle',
@@ -216,7 +220,7 @@ function setupSource(){
     }
   });
 
-  /* ===== 選択 ===== */
+  /* 選択 */
   map.addLayer({
     id:'selected',
     type:'circle',
@@ -230,7 +234,7 @@ function setupSource(){
     }
   });
 
-  /* ===== 番号 ===== */
+  /* 番号 */
   map.addLayer({
     id:'labels',
     type:'symbol',
@@ -243,25 +247,30 @@ function setupSource(){
     paint:{ 'text-color':'#fff' }
   });
 
-  /* ===== 吹き出し（常時表示＋衝突回避） ===== */
+  /* ===== 吹き出し（ズーム OR 選択） ===== */
   map.addLayer({
     id:'name-label',
     type:'symbol',
     source:'onsens',
-    filter:['!has','point_count'],
+    filter:[
+      'all',
+      ['!has','point_count'],
+      ['any',
+        ['>=',['zoom'],11],
+        ['in',['get','id'],['literal', selected]]
+      ]
+    ],
     layout:{
       'text-field':['get','name'],
-      'text-size':10,
+      'text-size':11,
       'text-offset':[0.8,-0.8],
-      'text-anchor':'left',
-      'text-allow-overlap': false
+      'text-anchor':'left'
     },
     paint:{
-      'text-color':'#333',
+      'text-color':'#000',
       'text-halo-color':'#fff',
-      'text-halo-width':1
-    },
-    minzoom:11
+      'text-halo-width':4
+    }
   });
 
   map.moveLayer('selected');
@@ -304,8 +313,19 @@ function makeGeoJSON(){
 /* ===== 更新 ===== */
 function update(){
   map.getSource('onsens').setData(makeGeoJSON());
+
   map.setFilter('selected',['in','id',...selected]);
   map.setFilter('labels',['in','id',...selected]);
+
+  /* ラベル再適用（OR条件） */
+  map.setFilter('name-label',[
+    'all',
+    ['!has','point_count'],
+    ['any',
+      ['>=',['zoom'],11],
+      ['in',['get','id'],['literal', selected]]
+    ]
+  ]);
 }
 
 /* ===== UI ===== */
