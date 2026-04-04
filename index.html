@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>温泉マップ</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
@@ -36,6 +36,12 @@ body{
   text-align:center;
 }
 
+.auth-title{
+  color:#fff;
+  margin-bottom:12px;
+  font-weight:600;
+}
+
 .auth-card input,
 .auth-card button{
   width:100%;
@@ -56,10 +62,9 @@ body{
   position:fixed;
   inset:0;
   opacity:0;
-  transition:.6s;
+  transition:.5s;
 }
 
-/* マップ */
 #map{
   position:fixed;
   top:0;
@@ -80,13 +85,11 @@ body{
   padding:14px;
 }
 
-/* ★ スクロール対応 */
 #selected{
-  max-height:200px;
+  max-height:220px;
   overflow-y:auto;
 }
 
-/* アイテム */
 .selected-item{
   display:flex;
   justify-content:space-between;
@@ -97,7 +100,6 @@ body{
   border-radius:10px;
 }
 
-/* ★ Apple風削除ボタン */
 .remove-btn{
   width:26px;
   height:26px;
@@ -106,22 +108,15 @@ body{
   color:#555;
   border:none;
   font-size:16px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  transition:.2s;
-}
-.remove-btn:active{
-  background:#d1d1d6;
 }
 
-/* フッター */
+/* ===== フッター ===== */
 .footer{
   position:fixed;
-  bottom:0;
+  bottom:env(safe-area-inset-bottom);
   width:100%;
   backdrop-filter:blur(20px);
-  background:rgba(255,255,255,0.75);
+  background:rgba(255,255,255,0.9);
   padding:10px;
   display:flex;
   justify-content:center;
@@ -156,6 +151,7 @@ button{
 
 <div id="auth">
   <div class="auth-card">
+    <div class="auth-title">温泉マップ</div>
     <input type="password" id="pw" placeholder="パスワード">
     <button onclick="login()">ログイン</button>
   </div>
@@ -184,9 +180,7 @@ button{
 
 /* ===== モバイル判定 ===== */
 const isMobile = window.matchMedia("(pointer: coarse)").matches;
-if(isMobile){
-  document.body.classList.add("mobile");
-}
+if(isMobile) document.body.classList.add("mobile");
 
 /* パスワード */
 const PW_HASH="b25zZW4=";
@@ -215,6 +209,7 @@ function login(){
   init();
 }
 
+/* ===== 初期化 ===== */
 async function init(){
   await loadCSV();
 
@@ -228,9 +223,18 @@ async function init(){
   map.on('load',()=>{
     setup();
     renderSelected();
+
+    map.addSource('route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addLayer({
+      id:'route-line',
+      type:'line',
+      source:'route',
+      paint:{'line-color':'#007aff','line-width':4}
+    });
   });
 }
 
+/* CSV */
 async function loadCSV(){
   const res=await fetch("onsen.csv");
   const text=await res.text();
@@ -276,8 +280,33 @@ function setup(){
     }
   });
 
+  /* ★ ラベル復活 */
+  map.addLayer({
+    id:'label',
+    type:'symbol',
+    source:'onsen',
+    filter:['!has','point_count'],
+    layout:{
+      'text-field':['get','name'],
+      'text-size':10,
+      'text-offset':[0,1.2]
+    },
+    paint:{
+      'text-halo-color':'#fff',
+      'text-halo-width':2
+    }
+  });
+
   map.on('click','points',e=>{
     toggle(e.features[0].properties.id);
+  });
+
+  /* ★ クラスタズーム復活 */
+  map.on('click','cluster',e=>{
+    const f=map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
+    map.getSource('onsen').getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{
+      map.easeTo({center:f.geometry.coordinates,zoom});
+    });
   });
 }
 
@@ -296,6 +325,34 @@ function geo(){
   };
 }
 
+/* ===== ルート ===== */
+async function drawRoute(){
+  if(selected.length<2) return;
+
+  const coords=selected.map(i=>{
+    const o=onsens[i];
+    return `${o.lng},${o.lat}`;
+  }).join(';');
+
+  const url=`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`;
+  const res=await fetch(url);
+  const data=await res.json();
+
+  map.getSource('route').setData({
+    type:'Feature',
+    geometry:data.routes[0].geometry
+  });
+}
+
+/* ===== 最適化 ===== */
+async function optimizeRoute(){
+  if(selected.length<2) return;
+
+  selected.sort((a,b)=>onsens[a].lat-onsens[b].lat);
+  renderSelected();
+  await drawRoute();
+}
+
 /* ===== UI ===== */
 function renderSelected(){
   if(isMobile) return;
@@ -312,13 +369,6 @@ function renderSelected(){
     `;
     el.appendChild(d);
   });
-
-  new Sortable(el,{
-    animation:150,
-    onEnd:()=>{
-      selected=[...el.children].map((_,idx)=>selected[idx]);
-    }
-  });
 }
 
 function removeItem(i){
@@ -334,7 +384,10 @@ function toggle(i){
   renderSelected();
 }
 
-/* ===== その他 ===== */
+function clearRoute(){
+  map.getSource('route').setData({type:'FeatureCollection',features:[]});
+}
+
 function toggleStartMode(){
   startFromCurrent=!startFromCurrent;
   document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
