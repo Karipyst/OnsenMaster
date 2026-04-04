@@ -16,17 +16,9 @@ body {
   background:#f2f2f7;
 }
 
-#map {
-  position:fixed;
-  top:0;
-  width:100%;
-  height:65vh;
-}
+#map { position:fixed; top:0; width:100%; height:65vh; }
 
-.main {
-  margin-top:65vh;
-  padding:12px;
-}
+.main { margin-top:65vh; padding:12px; }
 
 .selected-container {
   backdrop-filter: blur(20px);
@@ -42,7 +34,7 @@ body {
   border-radius:10px;
 }
 
-/* ===== フッター（1段） ===== */
+/* ===== フッター ===== */
 .footer {
   position:fixed;
   bottom:0;
@@ -55,35 +47,30 @@ body {
   align-items:center;
 }
 
-/* 中央ボタン群 */
 .center-group {
   display:flex;
   gap:8px;
   margin:0 auto;
 }
 
-/* 右ボタン群 */
 .right-group {
   display:flex;
   gap:8px;
   margin-right:10px;
 }
 
-/* ボタン */
 button {
   padding:10px 14px;
   border:none;
   border-radius:12px;
   font-size:13px;
-  transition:transform 0.15s ease, opacity 0.2s;
+  transition:transform 0.15s ease;
 }
 
-/* 押下アニメ */
 button:active {
   transform:scale(0.9);
 }
 
-/* 色 */
 .primary { background:#007aff; color:#fff; }
 .secondary { background:#34c759; color:#fff; }
 .danger { background:#ff3b30; color:#fff; }
@@ -92,16 +79,6 @@ button:active {
 .toggle.active {
   background:#34c759;
   color:#fff;
-}
-
-/* ルートフェード */
-.route-fade {
-  animation:fadeIn 0.4s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity:0; }
-  to { opacity:1; }
 }
 </style>
 </head>
@@ -118,20 +95,16 @@ button:active {
 </div>
 
 <div class="footer">
-
-  <!-- 中央 -->
   <div class="center-group">
     <button onclick="drawRoute()" class="primary">地図表示</button>
     <button onclick="optimizeRoute()" class="secondary">最適化</button>
     <button onclick="clearRoute()" class="danger">削除</button>
   </div>
 
-  <!-- 右 -->
   <div class="right-group">
     <button onclick="generateRoute()" class="primary">GoogleMap</button>
     <button id="toggleStart" class="neutral toggle" onclick="toggleStartMode()">現在地</button>
   </div>
-
 </div>
 
 <script>
@@ -142,6 +115,8 @@ let onsens = [];
 let selected = [];
 let map;
 let startFromCurrent = false;
+let dashStep = 0;
+let animationId = null;
 
 const typeColor = {
   "塩化物泉":"#e74c3c",
@@ -150,6 +125,7 @@ const typeColor = {
   "含鉄泉":"#d35400"
 };
 
+/* ===== CSV ===== */
 async function loadCSV(){
   const res = await fetch("onsen.csv");
   const text = await res.text();
@@ -161,6 +137,7 @@ async function loadCSV(){
   });
 }
 
+/* ===== 初期化 ===== */
 async function init(){
   await loadCSV();
 
@@ -184,7 +161,7 @@ async function init(){
       paint:{
         'line-color':'#007aff',
         'line-width':3,
-        'line-opacity':0.9
+        'line-dasharray':[0,4]
       }
     });
   });
@@ -192,6 +169,7 @@ async function init(){
 
 init();
 
+/* ===== Map Setup ===== */
 function setup(){
 
   map.addSource('onsen',{
@@ -206,6 +184,21 @@ function setup(){
     source:'onsen',
     filter:['has','point_count'],
     paint:{ 'circle-color':'#636e72','circle-radius':18 }
+  });
+
+  /* ★ クラスタ数復活 */
+  map.addLayer({
+    id:'cluster-count',
+    type:'symbol',
+    source:'onsen',
+    filter:['has','point_count'],
+    layout:{
+      'text-field':['get','point_count'],
+      'text-size':12
+    },
+    paint:{
+      'text-color':'#fff'
+    }
   });
 
   map.addLayer({
@@ -262,6 +255,7 @@ function setup(){
   });
 }
 
+/* ===== Geo ===== */
 function geo(){
   return {
     type:'FeatureCollection',
@@ -278,17 +272,83 @@ function geo(){
   };
 }
 
+/* ===== 更新 ===== */
 function update(){
   map.getSource('onsen').setData(geo());
   map.setFilter('selected',['in','id',...selected]);
   map.setFilter('order',['in','id',...selected]);
 }
 
+/* ===== ピンアニメーション ===== */
+function animatePin(){
+  let t = 0;
+  const base = 14;
+
+  function frame(){
+    t += 0.2;
+    const scale = base + Math.sin(t)*4;
+    map.setPaintProperty('selected','circle-radius',scale);
+
+    if(t < Math.PI){
+      requestAnimationFrame(frame);
+    }else{
+      map.setPaintProperty('selected','circle-radius',14);
+    }
+  }
+
+  frame();
+}
+
+/* ===== ルート描画アニメーション ===== */
+function animateRoute(){
+  if(animationId) cancelAnimationFrame(animationId);
+
+  dashStep = 0;
+
+  function step(){
+    dashStep += 0.5;
+    map.setPaintProperty('route-line','line-dasharray',[dashStep,4]);
+
+    if(dashStep < 10){
+      animationId = requestAnimationFrame(step);
+    }else{
+      map.setPaintProperty('route-line','line-dasharray',[1,0]);
+    }
+  }
+
+  step();
+}
+
+/* ===== ルート描画 ===== */
+async function drawRoute(){
+  if(selected.length < 2) return;
+
+  const coords = selected.map(i=>{
+    const o = onsens[i];
+    return `${o.lng},${o.lat}`;
+  }).join(';');
+
+  const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+  const data = await res.json();
+
+  map.getSource('route').setData({
+    type:'Feature',
+    geometry:data.routes[0].geometry
+  });
+
+  animateRoute();
+}
+
+function clearRoute(){
+  map.getSource('route').setData({
+    type:'FeatureCollection',
+    features:[]
+  });
+}
+
 /* ===== 最適化 ===== */
 function optimizeRoute(){
   if(selected.length < 2) return;
-
-  document.body.style.opacity = 0.85;
 
   const remaining = [...selected];
   const result = [];
@@ -320,34 +380,9 @@ function optimizeRoute(){
   update();
   renderSelected();
   drawRoute();
-
-  setTimeout(()=>document.body.style.opacity = 1,200);
 }
 
-async function drawRoute(){
-  if(selected.length < 2) return;
-
-  const coords = selected.map(i=>{
-    const o = onsens[i];
-    return `${o.lng},${o.lat}`;
-  }).join(';');
-
-  const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
-  const data = await res.json();
-
-  map.getSource('route').setData({
-    type:'Feature',
-    geometry:data.routes[0].geometry
-  });
-}
-
-function clearRoute(){
-  map.getSource('route').setData({
-    type:'FeatureCollection',
-    features:[]
-  });
-}
-
+/* ===== UI ===== */
 function renderSelected(){
   const el=document.getElementById("selected");
   el.innerHTML="";
@@ -376,6 +411,7 @@ function toggle(i){
 
   update();
   renderSelected();
+  animatePin();
 }
 
 function toggleStartMode(){
