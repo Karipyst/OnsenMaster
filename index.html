@@ -101,7 +101,6 @@ let selected = [];
 let map;
 let startFromCurrent = true;
 
-/* ===== 泉質カラー ===== */
 const typeColor = {
   "塩化物泉":"#e74c3c",
   "炭酸泉":"#3498db",
@@ -152,13 +151,7 @@ function setup(){
     type:'geojson',
     data:geo(),
     cluster:true,
-    clusterRadius:50,
-    clusterProperties:{
-      selectedCount:[
-        "+",
-        ["case", ["in", ["get","id"], ["literal", selected]], 1, 0]
-      ]
-    }
+    clusterRadius:50
   });
 
   /* クラスタ */
@@ -168,12 +161,7 @@ function setup(){
     source:'onsen',
     filter:['has','point_count'],
     paint:{
-      'circle-color':[
-        'case',
-        ['>', ['get','selectedCount'], 0],
-        '#ff9500',
-        '#636e72'
-      ],
+      'circle-color':'#636e72',
       'circle-radius':18
     }
   });
@@ -187,7 +175,7 @@ function setup(){
     paint:{ 'text-color':'#fff' }
   });
 
-  /* 通常ピン */
+  /* 通常 */
   map.addLayer({
     id:'points',
     type:'circle',
@@ -201,7 +189,7 @@ function setup(){
     }
   });
 
-  /* 選択ピン */
+  /* 選択 */
   map.addLayer({
     id:'selected',
     type:'circle',
@@ -215,9 +203,9 @@ function setup(){
     }
   });
 
-  /* 順番表示 */
+  /* 順番 */
   map.addLayer({
-    id:'order-label',
+    id:'order',
     type:'symbol',
     source:'onsen',
     filter:['in','id',-1],
@@ -225,9 +213,7 @@ function setup(){
       'text-field':['get','order'],
       'text-size':11
     },
-    paint:{
-      'text-color':'#fff'
-    }
+    paint:{ 'text-color':'#fff' }
   });
 
   /* 名前 */
@@ -278,11 +264,12 @@ function geo(){
   };
 }
 
-/* ===== 更新 ===== */
+/* ===== 更新（安定版） ===== */
 function update(){
   map.getSource('onsen').setData(geo());
+
   map.setFilter('selected',['in','id',...selected]);
-  map.setFilter('order-label',['in','id',...selected]);
+  map.setFilter('order',['in','id',...selected]);
 }
 
 /* ===== UI ===== */
@@ -316,13 +303,13 @@ function toggle(i){
   renderSelected();
 }
 
-/* ===== 現在地トグル ===== */
+/* ===== 現在地 ===== */
 function toggleStartMode(){
   startFromCurrent=!startFromCurrent;
   document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
 }
 
-/* ===== ルート生成 ===== */
+/* ===== ルート ===== */
 function generateRoute(){
   if(!selected.length) return;
 
