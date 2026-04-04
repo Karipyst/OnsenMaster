@@ -10,45 +10,77 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <style>
-body { margin:0; font-family:sans-serif; background:#f5f1e6; }
-#map { height:45dvh; }
-
-.card {
-  margin:10px; padding:15px;
-  background:#fff; border-radius:12px;
-  cursor:pointer; border:2px solid transparent;
+body {
+  margin:0;
+  font-family:sans-serif;
+  background:#f5f1e6;
 }
-.card.active {
-  border:2px solid #e67e22;
-  background:#fff7ed;
+
+/* ===== 上部固定マップ ===== */
+#map {
+  position:fixed;
+  top:0;
+  left:0;
+  width:100%;
+  height:40vh;
+  z-index:10;
+}
+
+/* ===== 中央スクロール領域 ===== */
+.main {
+  margin-top:40vh;
+  margin-bottom:90px;
+  padding:10px;
 }
 
 .selected-list {
-  margin:10px; padding:10px;
-  background:#fff; border-radius:12px;
+  background:#fff;
+  border-radius:12px;
+  padding:10px;
+  max-height:40vh;
+  overflow-y:auto;
 }
+
 .selected-item {
-  padding:10px; margin:5px 0;
-  background:#eee; border-radius:8px;
+  padding:10px;
+  margin:5px 0;
+  background:#eee;
+  border-radius:8px;
   cursor:grab;
 }
 
+/* ===== 下部固定操作 ===== */
+.footer {
+  position:fixed;
+  bottom:0;
+  left:0;
+  width:100%;
+  background:#fff;
+  border-top:1px solid #ccc;
+  padding:10px;
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  z-index:20;
+}
+
 .route-btn {
-  width:100%; padding:14px;
-  margin-top:10px;
-  font-size:16px;
+  padding:12px 16px;
+  font-size:14px;
   background:#e67e22;
   color:#fff;
   border:none;
+  border-radius:8px;
 }
 
 .toggle-btn {
-  width:100%;
   padding:10px;
-  margin-top:10px;
-  border:none;
+  font-size:12px;
   background:#ccc;
+  border:none;
+  border-radius:8px;
 }
+
 .toggle-btn.active {
   background:#e67e22;
   color:#fff;
@@ -59,19 +91,21 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
 <body>
 
 <div id="map"></div>
-<div id="list"></div>
 
-<div class="selected-list">
-<b>選択ルート</b>
-<div id="selected"></div>
+<div class="main">
+  <div class="selected-list">
+    <b>選択ルート</b>
+    <div id="selected"></div>
+  </div>
+</div>
 
-<button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">
-現在地から：ON
-</button>
-
-<button onclick="generateRoute()" class="route-btn">
-GoogleMapで開く
-</button>
+<div class="footer">
+  <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">
+    現在地
+  </button>
+  <button onclick="generateRoute()" class="route-btn">
+    GoogleMap
+  </button>
 </div>
 
 <script>
@@ -83,18 +117,17 @@ let selected = [];
 let map;
 let startFromCurrent = true;
 
-/* ===== CSV読み込み ===== */
+/* ===== CSV ===== */
 async function loadCSV(){
   const res = await fetch("onsen.csv");
   let text = await res.text();
   text = text.replace(/^\uFEFF/, '');
-
   const lines = text.trim().split(/\r?\n/);
 
   onsens = lines.slice(1).map(line=>{
     const cols = line.split(",");
     return {
-      name: cols[0].trim(),
+      name: cols[0],
       lat: Number(cols[1]),
       lng: Number(cols[2]),
       type: cols[3]
@@ -119,30 +152,16 @@ async function initMap(){
   map.on('load', () => {
     map.resize();
     setupSource();
-    renderList();
+    renderSelected();
   });
 }
 
 initMap();
 
-/* ===== GeoJSON + cluster ===== */
+/* ===== Source ===== */
 function setupSource(){
 
-  const geojson = {
-    type: 'FeatureCollection',
-    features: onsens.map((o,i)=>({
-      type:'Feature',
-      geometry:{
-        type:'Point',
-        coordinates:[o.lng, o.lat]
-      },
-      properties:{
-        id: i,
-        name: o.name,
-        type: o.type
-      }
-    }))
-  };
+  const geojson = makeGeoJSON();
 
   map.addSource('onsens', {
     type:'geojson',
@@ -152,18 +171,17 @@ function setupSource(){
     clusterRadius:50
   });
 
-  /* 色定義 */
   const typeColor = [
     'match',
     ['get','type'],
-    '塩化物泉', '#e74c3c',
-    '炭酸泉', '#3498db',
-    '単純温泉', '#7f8c8d',
-    '含鉄泉', '#d2691e',
+    '塩化物泉','#e74c3c',
+    '炭酸泉','#3498db',
+    '単純温泉','#7f8c8d',
+    '含鉄泉','#d2691e',
     '#95a5a6'
   ];
 
-  /* クラスター */
+  /* cluster */
   map.addLayer({
     id:'clusters',
     type:'circle',
@@ -171,10 +189,7 @@ function setupSource(){
     filter:['has','point_count'],
     paint:{
       'circle-color':'#e67e22',
-      'circle-radius':[
-        'step',['get','point_count'],
-        15,10,20,30,25
-      ]
+      'circle-radius':['step',['get','point_count'],15,10,20,30,25]
     }
   });
 
@@ -189,7 +204,7 @@ function setupSource(){
     }
   });
 
-  /* 通常ポイント */
+  /* 通常 */
   map.addLayer({
     id:'unclustered',
     type:'circle',
@@ -197,42 +212,32 @@ function setupSource(){
     filter:['!has','point_count'],
     paint:{
       'circle-color': typeColor,
-      'circle-radius': [
-        'interpolate',['linear'],['zoom'],
-        5,4,
-        10,7,
-        15,10
-      ],
-      'circle-stroke-width': 1,
-      'circle-stroke-color': '#fff'
-    }
-  });
-
-  /* 選択ポイント（色そのまま＋拡大） */
-  map.addLayer({
-    id:'selected-points',
-    type:'circle',
-    source:'onsens',
-    filter:['in','id', -1],
-    paint:{
-      'circle-color': typeColor,
-      'circle-radius': [
-        'interpolate',['linear'],['zoom'],
-        5,8,
-        10,12,
-        15,16
-      ],
-      'circle-stroke-width': 3,
+      'circle-radius':['interpolate',['linear'],['zoom'],5,4,12,8,16,12],
+      'circle-stroke-width':1,
       'circle-stroke-color':'#fff'
     }
   });
 
-  /* 選択番号表示 */
+  /* 選択 */
   map.addLayer({
-    id:'selected-label',
+    id:'selected',
+    type:'circle',
+    source:'onsens',
+    filter:['in','id',-1],
+    paint:{
+      'circle-color': typeColor,
+      'circle-radius':['interpolate',['linear'],['zoom'],5,8,12,12,16,16],
+      'circle-stroke-width':3,
+      'circle-stroke-color':'#fff'
+    }
+  });
+
+  /* 番号 */
+  map.addLayer({
+    id:'labels',
     type:'symbol',
     source:'onsens',
-    filter:['in','id', -1],
+    filter:['in','id',-1],
     layout:{
       'text-field':['get','order'],
       'text-size':12
@@ -242,121 +247,107 @@ function setupSource(){
     }
   });
 
-  map.moveLayer('selected-points');
-  map.moveLayer('selected-label');
+  /* 温泉名（ズーム時） */
+  map.addLayer({
+    id:'name-label',
+    type:'symbol',
+    source:'onsens',
+    filter:['!has','point_count'],
+    layout:{
+      'text-field':['get','name'],
+      'text-size':10,
+      'text-offset':[0,1.2],
+      'text-anchor':'top'
+    },
+    paint:{
+      'text-color':'#333'
+    },
+    minzoom:12
+  });
 
-  /* クラスタクリック */
-  map.on('click','clusters', (e)=>{
+  map.moveLayer('selected');
+  map.moveLayer('labels');
+
+  map.on('click','unclustered', e=>{
+    toggle(Number(e.features[0].properties.id));
+  });
+
+  map.on('click','clusters', e=>{
     const features = map.queryRenderedFeatures(e.point,{layers:['clusters']});
     const clusterId = features[0].properties.cluster_id;
 
-    map.getSource('onsens').getClusterExpansionZoom(clusterId, (err, zoom)=>{
-      if(err) return;
+    map.getSource('onsens').getClusterExpansionZoom(clusterId,(err,zoom)=>{
       map.easeTo({
-        center: features[0].geometry.coordinates,
-        zoom: zoom
+        center:features[0].geometry.coordinates,
+        zoom
       });
     });
   });
-
-  /* 単体クリック */
-  map.on('click','unclustered', (e)=>{
-    const id = Number(e.features[0].properties.id);
-    toggle(id);
-  });
-
 }
 
-/* ===== 選択反映（番号付き） ===== */
-function updateSelectedLayer(){
-
-  // order付与したGeoJSON再生成
-  const geojson = {
-    type: 'FeatureCollection',
+/* ===== GeoJSON生成 ===== */
+function makeGeoJSON(){
+  return {
+    type:'FeatureCollection',
     features: onsens.map((o,i)=>({
       type:'Feature',
-      geometry:{
-        type:'Point',
-        coordinates:[o.lng, o.lat]
-      },
+      geometry:{type:'Point',coordinates:[o.lng,o.lat]},
       properties:{
-        id: i,
-        name: o.name,
-        type: o.type,
-        order: selected.indexOf(i) >= 0 ? String(selected.indexOf(i)+1) : ''
+        id:i,
+        name:o.name,
+        type:o.type,
+        order: selected.indexOf(i)>=0 ? String(selected.indexOf(i)+1) : ''
       }
     }))
   };
-
-  map.getSource('onsens').setData(geojson);
-
-  map.setFilter('selected-points', ['in','id', ...selected]);
-  map.setFilter('selected-label', ['in','id', ...selected]);
 }
 
-/* ===== リスト ===== */
-function renderList(){
-  const list = document.getElementById("list");
-  list.innerHTML="";
-
-  onsens.forEach((o,i)=>{
-    const div=document.createElement("div");
-    div.className="card";
-    if(selected.includes(i)) div.classList.add("active");
-
-    div.innerHTML=`<b>${o.name}</b>`;
-    div.onclick=()=>toggle(i);
-
-    list.appendChild(div);
-  });
-
-  renderSelected();
+/* ===== 更新 ===== */
+function update(){
+  map.getSource('onsens').setData(makeGeoJSON());
+  map.setFilter('selected',['in','id',...selected]);
+  map.setFilter('labels',['in','id',...selected]);
 }
 
-/* ===== 選択 ===== */
-function toggle(i){
-  if(selected.includes(i)){
-    selected = selected.filter(x=>x!==i);
-  }else{
-    selected.push(i);
-  }
-
-  updateSelectedLayer();
-  renderList();
-}
-
-/* ===== 並び替え ===== */
+/* ===== UI ===== */
 function renderSelected(){
   const el=document.getElementById("selected");
   el.innerHTML="";
 
   selected.forEach(i=>{
-    const item=document.createElement("div");
-    item.className="selected-item";
-    item.dataset.id=i;
-    item.innerText=onsens[i].name;
-    el.appendChild(item);
+    const d=document.createElement("div");
+    d.className="selected-item";
+    d.dataset.id=i;
+    d.innerText=onsens[i].name;
+    el.appendChild(d);
   });
 
   new Sortable(el,{
     animation:150,
     onEnd:()=>{
       selected=[...el.children].map(e=>parseInt(e.dataset.id));
-      updateSelectedLayer();
-      renderList();
+      update();
     }
   });
 }
 
-/* ===== 出発地切替 ===== */
+function toggle(i){
+  if(selected.includes(i)){
+    selected=selected.filter(x=>x!==i);
+  }else{
+    selected.push(i);
+  }
+  update();
+  renderSelected();
+}
+
+/* ===== ボタン ===== */
 function toggleStartMode(){
   startFromCurrent=!startFromCurrent;
   const btn=document.getElementById("toggleStart");
   btn.classList.toggle("active",startFromCurrent);
-  btn.innerText="現在地から：" + (startFromCurrent ? "ON" : "OFF");
 }
 
-/* ===== ルート生成 ===== */
 function generateRoute(){
   if(selected.length<1) return;
 
@@ -375,6 +366,5 @@ function generateRoute(){
 }
 
 </script>
-
 </body>
 </html>
