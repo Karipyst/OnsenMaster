@@ -17,7 +17,6 @@ body {
   color:#1c1c1e;
 }
 
-/* ===== マップ ===== */
 #map {
   position:fixed;
   top:0;
@@ -25,7 +24,6 @@ body {
   height:65vh;
 }
 
-/* ===== Apple風カード ===== */
 .main {
   margin-top:65vh;
   padding:12px;
@@ -36,13 +34,6 @@ body {
   background:rgba(255,255,255,0.75);
   border-radius:16px;
   padding:14px;
-  box-shadow:0 10px 25px rgba(0,0,0,0.08);
-}
-
-.selected-title {
-  font-weight:600;
-  font-size:14px;
-  margin-bottom:6px;
 }
 
 .selected-item {
@@ -50,17 +41,15 @@ body {
   margin:6px 0;
   background:rgba(0,0,0,0.05);
   border-radius:10px;
-  font-size:13px;
 }
 
-/* ===== フッター ===== */
+/* フッター */
 .footer {
   position:fixed;
   bottom:0;
   width:100%;
   backdrop-filter: blur(20px);
   background:rgba(255,255,255,0.75);
-  border-top:1px solid rgba(0,0,0,0.1);
   padding:10px;
   display:flex;
   justify-content:center;
@@ -76,15 +65,10 @@ body {
 }
 
 .toggle-btn {
-  padding:10px 14px;
+  padding:10px;
   background:#d1d1d6;
   border:none;
   border-radius:12px;
-}
-
-.toggle-btn.active {
-  background:#34c759;
-  color:#fff;
 }
 </style>
 </head>
@@ -95,14 +79,13 @@ body {
 
 <div class="main">
   <div class="selected-container">
-    <div class="selected-title">選択ルート</div>
+    <div>選択ルート</div>
     <div id="selected"></div>
   </div>
 </div>
 
 <div class="footer">
   <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
-  <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">現在地</button>
 </div>
 
 <script>
@@ -114,7 +97,7 @@ let selected = [];
 let map;
 
 /* ===== 泉質カラー ===== */
-const typeColorMap = {
+const typeColor = {
   "塩化物泉":"#e74c3c",
   "炭酸泉":"#3498db",
   "単純温泉":"#95a5a6",
@@ -139,7 +122,7 @@ async function loadCSV(){
 }
 
 /* ===== 初期化 ===== */
-async function initMap(){
+async function init(){
   await loadCSV();
 
   map = new maplibregl.Map({
@@ -149,77 +132,78 @@ async function initMap(){
     zoom:6
   });
 
-  map.on('load', ()=>{
+  map.on('load',()=>{
     setup();
     renderSelected();
   });
 }
 
-initMap();
+init();
 
 /* ===== Source ===== */
 function setup(){
 
-  map.addSource('onsens',{
+  map.addSource('onsen',{
     type:'geojson',
     data:geo(),
     cluster:true,
     clusterRadius:50
   });
 
-  /* ===== クラスタ（選択含有で色変更） */
+  /* クラスタ */
   map.addLayer({
-    id:'clusters',
+    id:'cluster',
     type:'circle',
-    source:'onsens',
+    source:'onsen',
     filter:['has','point_count'],
     paint:{
-      'circle-color':[
-        'case',
-        ['>', ['get','selectedCount'], 0],
-        '#ff9500',   // 選択あり
-        '#8e8e93'    // 通常
-      ],
-      'circle-radius':20
+      'circle-color':'#636e72',
+      'circle-radius':18
     }
   });
 
   map.addLayer({
     id:'cluster-count',
     type:'symbol',
-    source:'onsens',
+    source:'onsen',
     filter:['has','point_count'],
-    layout:{
-      'text-field':['get','point_count']
-    },
+    layout:{ 'text-field':['get','point_count'] },
     paint:{ 'text-color':'#fff' }
   });
 
-  /* ===== 温泉ピン（♨） ===== */
+  /* 未選択 */
   map.addLayer({
-    id:'onsen-icon',
-    type:'symbol',
-    source:'onsens',
+    id:'points',
+    type:'circle',
+    source:'onsen',
     filter:['!has','point_count'],
-    layout:{
-      'text-field':'♨',
-      'text-size':18
-    },
     paint:{
-      'text-color':[
-        'case',
-        ['in',['get','id'],['literal',selected]],
-        '#ff3b30', // 選択
-        ['get','color'] // 泉質
-      ]
+      'circle-color':['get','color'],
+      'circle-radius':8,
+      'circle-stroke-width':1,
+      'circle-stroke-color':'#fff'
     }
   });
 
-  /* ===== 名前 ===== */
+  /* 選択 */
+  map.addLayer({
+    id:'selected',
+    type:'circle',
+    source:'onsen',
+    filter:['in','id',-1],
+    paint:{
+      'circle-color':['get','color'],
+      'circle-radius':14,
+      'circle-stroke-width':3,
+      'circle-stroke-color':'#f1c40f'
+    }
+  });
+
+  /* 名前 */
   map.addLayer({
     id:'label',
     type:'symbol',
-    source:'onsens',
+    source:'onsen',
     filter:['!has','point_count'],
     layout:{
       'text-field':['get','name'],
@@ -228,12 +212,21 @@ function setup(){
     },
     paint:{
       'text-halo-color':'#fff',
-      'text-halo-width':3
+      'text-halo-width':2
     }
   });
 
-  map.on('click','onsen-icon',e=>{
+  map.on('click','points',e=>{
     toggle(e.features[0].properties.id);
+  });
+
+  map.on('click','cluster',e=>{
+    const f = map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
+    const id = f.properties.cluster_id;
+
+    map.getSource('onsen').getClusterExpansionZoom(id,(err,zoom)=>{
+      map.easeTo({center:f.geometry.coordinates, zoom});
+    });
   });
 }
 
@@ -247,15 +240,15 @@ function geo(){
       properties:{
         id:i,
         name:o.name,
-        color:typeColorMap[o.type] || '#7f8c8d'
+        color:typeColor[o.type] || '#7f8c8d'
       }
     }))
   };
 }
 
-/* ===== 更新 ===== */
+/* ===== 更新（軽量） ===== */
 function update(){
-  map.getSource('onsens').setData(geo());
+  map.setFilter('selected',['in','id',...selected]);
 }
 
 /* ===== UI ===== */
@@ -289,11 +282,7 @@ function toggle(i){
   renderSelected();
 }
 
-/* ===== ボタン ===== */
-function toggleStartMode(){
-  document.getElementById("toggleStart").classList.toggle("active");
-}
-
+/* ===== ルート ===== */
 function generateRoute(){
   if(!selected.length) return;
 
