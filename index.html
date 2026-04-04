@@ -12,7 +12,7 @@
 <style>
 body { margin:0; font-family:sans-serif; background:#f5f1e6; }
 
-/* ===== マップ（2/3） ===== */
+/* ===== マップ ===== */
 #map {
   position:fixed;
   top:0;
@@ -28,10 +28,18 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   padding:10px;
 }
 
-.selected-list {
+.selected-container {
   background:#fff;
   border-radius:12px;
   padding:10px;
+}
+
+.selected-title {
+  font-weight:bold;
+  margin-bottom:5px;
+}
+
+.selected-list {
   max-height:30vh;
   overflow-y:auto;
 }
@@ -79,11 +87,6 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   background:#e67e22;
   color:#fff;
 }
-
-/* ===== 吹き出し ===== */
-.maplibregl-popup {
-  max-width:200px;
-}
 </style>
 </head>
 
@@ -92,9 +95,9 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
 <div id="map"></div>
 
 <div class="main">
-  <div class="selected-list">
-    <b>選択ルート</b>
-    <div id="selected"></div>
+  <div class="selected-container">
+    <div class="selected-title">選択ルート</div>
+    <div id="selected" class="selected-list"></div>
   </div>
 </div>
 
@@ -156,11 +159,9 @@ initMap();
 /* ===== Source ===== */
 function setupSource(){
 
-  const geojson = makeGeoJSON();
-
   map.addSource('onsens', {
     type:'geojson',
-    data: geojson,
+    data: makeGeoJSON(),
     cluster:true,
     clusterMaxZoom:10,
     clusterRadius:50
@@ -175,14 +176,14 @@ function setupSource(){
     '#95a5a6'
   ];
 
-  /* cluster */
+  /* ===== クラスタ（肌色） ===== */
   map.addLayer({
     id:'clusters',
     type:'circle',
     source:'onsens',
     filter:['has','point_count'],
     paint:{
-      'circle-color':'#e67e22',
+      'circle-color':'#f3d7c1',
       'circle-radius':['step',['get','point_count'],15,10,20,30,25]
     }
   });
@@ -195,10 +196,13 @@ function setupSource(){
     layout:{
       'text-field':['get','point_count'],
       'text-size':12
+    },
+    paint:{
+      'text-color':'#000'
     }
   });
 
-  /* 単体 */
+  /* ===== 単体 ===== */
   map.addLayer({
     id:'unclustered',
     type:'circle',
@@ -212,7 +216,7 @@ function setupSource(){
     }
   });
 
-  /* 選択 */
+  /* ===== 選択 ===== */
   map.addLayer({
     id:'selected',
     type:'circle',
@@ -226,7 +230,7 @@ function setupSource(){
     }
   });
 
-  /* 番号 */
+  /* ===== 番号 ===== */
   map.addLayer({
     id:'labels',
     type:'symbol',
@@ -239,27 +243,32 @@ function setupSource(){
     paint:{ 'text-color':'#fff' }
   });
 
+  /* ===== 吹き出し（常時表示＋衝突回避） ===== */
+  map.addLayer({
+    id:'name-label',
+    type:'symbol',
+    source:'onsens',
+    filter:['!has','point_count'],
+    layout:{
+      'text-field':['get','name'],
+      'text-size':10,
+      'text-offset':[0.8,-0.8],
+      'text-anchor':'left',
+      'text-allow-overlap': false
+    },
+    paint:{
+      'text-color':'#333',
+      'text-halo-color':'#fff',
+      'text-halo-width':1
+    },
+    minzoom:11
+  });
+
   map.moveLayer('selected');
   map.moveLayer('labels');
 
-  /* ===== 吹き出し表示 ===== */
-  let popup;
-
   map.on('click','unclustered', e=>{
-    const f = e.features[0];
-    const id = Number(f.properties.id);
-
-    toggle(id);
-
-    if(popup) popup.remove();
-
-    popup = new maplibregl.Popup({
-      offset:[10,-10],
-      closeButton:false
-    })
-    .setLngLat(f.geometry.coordinates)
-    .setHTML(`<small>${f.properties.name}</small>`)
-    .addTo(map);
+    toggle(Number(e.features[0].properties.id));
   });
 
   map.on('click','clusters', e=>{
@@ -334,8 +343,7 @@ function toggle(i){
 /* ===== ボタン ===== */
 function toggleStartMode(){
   startFromCurrent=!startFromCurrent;
-  const btn=document.getElementById("toggleStart");
-  btn.classList.toggle("active",startFromCurrent);
+  document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
 }
 
 function generateRoute(){
