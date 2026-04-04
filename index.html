@@ -10,25 +10,20 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <style>
-body {
-  margin:0;
-  font-family:sans-serif;
-  background:#f5f1e6;
-}
+body { margin:0; font-family:sans-serif; background:#f5f1e6; }
 
-/* ===== 上部固定マップ ===== */
+/* ===== マップ（2/3） ===== */
 #map {
   position:fixed;
   top:0;
-  left:0;
   width:100%;
-  height:40vh;
+  height:66vh;
   z-index:10;
 }
 
-/* ===== 中央スクロール領域 ===== */
+/* ===== メイン ===== */
 .main {
-  margin-top:40vh;
+  margin-top:66vh;
   margin-bottom:90px;
   padding:10px;
 }
@@ -37,7 +32,7 @@ body {
   background:#fff;
   border-radius:12px;
   padding:10px;
-  max-height:40vh;
+  max-height:30vh;
   overflow-y:auto;
 }
 
@@ -49,28 +44,27 @@ body {
   cursor:grab;
 }
 
-/* ===== 下部固定操作 ===== */
+/* ===== フッター ===== */
 .footer {
   position:fixed;
   bottom:0;
-  left:0;
   width:100%;
   background:#fff;
   border-top:1px solid #ccc;
   padding:10px;
   display:flex;
-  justify-content:flex-end;
+  justify-content:center;
+  align-items:center;
   gap:10px;
-  z-index:20;
 }
 
 .route-btn {
-  padding:12px 16px;
-  font-size:14px;
+  padding:14px 24px;
+  font-size:16px;
   background:#e67e22;
   color:#fff;
   border:none;
-  border-radius:8px;
+  border-radius:10px;
 }
 
 .toggle-btn {
@@ -84,6 +78,11 @@ body {
 .toggle-btn.active {
   background:#e67e22;
   color:#fff;
+}
+
+/* ===== 吹き出し ===== */
+.maplibregl-popup {
+  max-width:200px;
 }
 </style>
 </head>
@@ -100,12 +99,8 @@ body {
 </div>
 
 <div class="footer">
-  <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">
-    現在地
-  </button>
-  <button onclick="generateRoute()" class="route-btn">
-    GoogleMap
-  </button>
+  <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
+  <button id="toggleStart" class="toggle-btn active" onclick="toggleStartMode()">現在地</button>
 </div>
 
 <script>
@@ -172,8 +167,7 @@ function setupSource(){
   });
 
   const typeColor = [
-    'match',
-    ['get','type'],
+    'match',['get','type'],
     '塩化物泉','#e74c3c',
     '炭酸泉','#3498db',
     '単純温泉','#7f8c8d',
@@ -204,7 +198,7 @@ function setupSource(){
     }
   });
 
-  /* 通常 */
+  /* 単体 */
   map.addLayer({
     id:'unclustered',
     type:'circle',
@@ -212,8 +206,8 @@ function setupSource(){
     filter:['!has','point_count'],
     paint:{
       'circle-color': typeColor,
-      'circle-radius':['interpolate',['linear'],['zoom'],5,4,12,8,16,12],
-      'circle-stroke-width':1,
+      'circle-radius':10,
+      'circle-stroke-width':2,
       'circle-stroke-color':'#fff'
     }
   });
@@ -226,7 +220,7 @@ function setupSource(){
     filter:['in','id',-1],
     paint:{
       'circle-color': typeColor,
-      'circle-radius':['interpolate',['linear'],['zoom'],5,8,12,12,16,16],
+      'circle-radius':14,
       'circle-stroke-width':3,
       'circle-stroke-color':'#fff'
     }
@@ -242,34 +236,30 @@ function setupSource(){
       'text-field':['get','order'],
       'text-size':12
     },
-    paint:{
-      'text-color':'#fff'
-    }
-  });
-
-  /* 温泉名（ズーム時） */
-  map.addLayer({
-    id:'name-label',
-    type:'symbol',
-    source:'onsens',
-    filter:['!has','point_count'],
-    layout:{
-      'text-field':['get','name'],
-      'text-size':10,
-      'text-offset':[0,1.2],
-      'text-anchor':'top'
-    },
-    paint:{
-      'text-color':'#333'
-    },
-    minzoom:12
+    paint:{ 'text-color':'#fff' }
   });
 
   map.moveLayer('selected');
   map.moveLayer('labels');
 
+  /* ===== 吹き出し表示 ===== */
+  let popup;
+
   map.on('click','unclustered', e=>{
-    toggle(Number(e.features[0].properties.id));
+    const f = e.features[0];
+    const id = Number(f.properties.id);
+
+    toggle(id);
+
+    if(popup) popup.remove();
+
+    popup = new maplibregl.Popup({
+      offset:[10,-10],
+      closeButton:false
+    })
+    .setLngLat(f.geometry.coordinates)
+    .setHTML(`<small>${f.properties.name}</small>`)
+    .addTo(map);
   });
 
   map.on('click','clusters', e=>{
@@ -285,7 +275,7 @@ function setupSource(){
   });
 }
 
-/* ===== GeoJSON生成 ===== */
+/* ===== GeoJSON ===== */
 function makeGeoJSON(){
   return {
     type:'FeatureCollection',
