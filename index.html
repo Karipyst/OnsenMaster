@@ -169,11 +169,11 @@ button{
   </div>
 
   <div class="footer">
+    <button onclick="drawRoute()" class="route-btn">ルート表示</button>
+    <button onclick="optimizeRoute()" class="opt-btn">ルート最適化</button>
+    <button onclick="clearRoute()" class="clear-btn">ルートリセット</button>
     <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
-    <button onclick="drawRoute()" class="route-btn">地図表示</button>
-    <button onclick="optimizeRoute()" class="opt-btn">最適化</button>
-    <button onclick="clearRoute()" class="clear-btn">削除</button>
-    <button id="toggleStart" class="toggle-btn" onclick="toggleStartMode()">現在地</button>
+    <button id="toggleStart" class="toggle-btn" onclick="toggleStartMode()">現在地から検索</button>
   </div>
 </div>
 
@@ -211,7 +211,7 @@ function fitRoute(coords){
 
 /* ログイン */
 function login(){
-  if(atob(PW_HASH)!==pw.value){alert("違います");return;}
+  if(atob(PW_HASH)!==pw.value){alert("パスワードが違います");return;}
 
   const auth=document.getElementById("auth");
   const app=document.getElementById("app");
@@ -326,7 +326,7 @@ function setupMap(){
     type:'symbol',
     source:'onsen',
     filter:['in','id',-1],
-    layout:{'text-field':['get','order'],'text-size':12},
+    layout:{'text-field':['get','order'],'text-size':14},
     paint:{'text-color':'#fff'}
   });
 
