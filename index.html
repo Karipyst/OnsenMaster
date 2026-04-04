@@ -15,220 +15,97 @@ body{
   background:#f2f2f7;
 }
 
-/* ローディング */
-#loading{
-  position:fixed;inset:0;
-  display:flex;justify-content:center;align-items:center;
-  background:rgba(0,0,0,0.25);
-  opacity:0;pointer-events:none;transition:.3s;
-  z-index:20;
-}
-#loading.active{opacity:1;pointer-events:auto;}
-.spinner{
-  width:40px;height:40px;
-  border:4px solid #fff;border-top:4px solid transparent;
-  border-radius:50%;animation:spin 1s linear infinite;
-}
-@keyframes spin{to{transform:rotate(360deg);}}
-
-/* 認証 */
-#auth{
-  position:fixed;inset:0;
-  display:flex;justify-content:center;align-items:center;
-  background:linear-gradient(135deg,#0f172a,#1e293b);
-  z-index:10;
-  transition:opacity .6s ease, transform .6s ease;
-}
-.auth-card{
-  backdrop-filter:blur(20px);
-  background:rgba(255,255,255,0.1);
-  padding:30px;border-radius:20px;
-  width:260px;text-align:center;
-  transition:.5s;
-}
-.auth-title{color:#fff;margin-bottom:12px;}
-
-.auth-card input,.auth-card button{
-  width:100%;padding:12px;border:none;border-radius:10px;margin-bottom:10px;
-}
-.auth-card button{background:#34c759;color:#fff;}
-
-/* 本体 */
-#app{
-  position:fixed;
-  inset:0;
-  opacity:0;
-  transform:translateY(20px) scale(.98);
-  transition:opacity .6s ease, transform .6s ease;
+/* ===== フッター高さ固定 ===== */
+:root{
+  --footer-h:88px;
 }
 
-/* マップ */
+/* ===== マップ ===== */
 #map{
   position:fixed;
   top:0;
   width:100%;
-  height:65vh;
+  height:calc(100dvh - var(--footer-h));
 }
 
-/* PCリスト */
-.main{
-  margin-top:65vh;
-  padding:12px;
-}
-
-#selected{
-  max-height:220px;
-  overflow-y:auto;
-}
-
-.selected-item{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:10px;
-  margin:6px 0;
-  background:#fff;
-  border-radius:10px;
-}
-
-/* フッター */
+/* ===== フッター ===== */
 .footer{
   position:fixed;
-  bottom:env(safe-area-inset-bottom);
+  bottom:0;
   width:100%;
-  padding:10px;
+  height:var(--footer-h);
+  padding:8px 6px calc(env(safe-area-inset-bottom) + 6px);
   display:flex;
   justify-content:center;
-  gap:8px;
+  align-items:center;
+  gap:6px;
   flex-wrap:wrap;
-  background:rgba(255,255,255,0.9);
+  background:rgba(255,255,255,0.95);
   backdrop-filter:blur(20px);
 }
 
+/* ===== ボタン ===== */
 button{
-  padding:10px 14px;
-  border:none;border-radius:12px;
+  padding:8px 10px;
+  font-size:12px;
+  border:none;
+  border-radius:10px;
+  white-space:nowrap;
 }
+
 .route-btn{background:#007aff;color:#fff;}
 .opt-btn{background:#34c759;color:#fff;}
 .clear-btn{background:#ff3b30;color:#fff;}
 .toggle-btn{background:#d1d1d6;}
 .toggle-btn.active{background:#34c759;color:#fff;}
 
-/* モバイル最適化 */
-.mobile #map{
-  height:100dvh;
+/* ===== 選択リスト ===== */
+#selected{
+  position:fixed;
+  top:10px;
+  left:10px;
+  width:260px;
+  max-height:40vh;
+  overflow-y:auto;
+  z-index:5;
 }
-.mobile .main{
-  display:none;
+
+.selected-item{
+  padding:10px;
+  margin:6px 0;
+  background:#fff;
+  border-radius:10px;
+  cursor:grab;
+  font-size:13px;
 }
-.mobile .footer{
-  padding-bottom:calc(env(safe-area-inset-bottom) + 8px);
+
+.selected-item.dragging{
+  opacity:0.5;
 }
 </style>
 </head>
 
 <body>
 
-<div id="loading"><div class="spinner"></div></div>
+<div id="map"></div>
 
-<div id="auth">
-  <div class="auth-card">
-    <div class="auth-title">温泉マップ</div>
-    <input type="password" id="pw">
-    <button onclick="login()">ログイン</button>
-  </div>
-</div>
+<div id="selected"></div>
 
-<div id="app">
-  <div id="map"></div>
-
-  <div class="main">
-    <div id="selected"></div>
-  </div>
-
-  <div class="footer">
-    <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
-    <button onclick="drawRoute()" class="route-btn">地図表示</button>
-    <button onclick="optimizeRoute()" class="opt-btn">最適化</button>
-    <button onclick="clearRoute()" class="clear-btn">削除</button>
-    <button id="toggleStart" class="toggle-btn" onclick="toggleStartMode()">現在地</button>
-  </div>
+<div class="footer">
+  <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
+  <button onclick="drawRoute()" class="route-btn">地図</button>
+  <button onclick="optimizeRoute()" class="opt-btn">最適化</button>
+  <button onclick="clearRoute()" class="clear-btn">削除</button>
+  <button id="toggleStart" class="toggle-btn" onclick="toggleStartMode()">現在地</button>
 </div>
 
 <script>
 
-const isMobile = window.matchMedia("(pointer: coarse)").matches;
-if(isMobile) document.body.classList.add("mobile");
-
-const PW_HASH="b25zZW4=";
 const MAPTILER_KEY="5803br5MI3qRfp9DVSHL";
 
 let map,onsens=[],selected=[],startFromCurrent=false;
 
-function showLoading(v){
-  document.getElementById("loading").classList.toggle("active",v);
-}
-
-/* ★ 追加：全体フィット */
-function fitAllPoints(){
-  if(!onsens.length) return;
-
-  const bounds=new maplibregl.LngLatBounds(
-    [onsens[0].lng,onsens[0].lat],
-    [onsens[0].lng,onsens[0].lat]
-  );
-
-  onsens.forEach(o=>bounds.extend([o.lng,o.lat]));
-
-  map.fitBounds(bounds,{
-    padding:{
-      top:40,
-      bottom:isMobile?120:200,
-      left:40,
-      right:40
-    },
-    duration:0
-  });
-}
-
-/* ★ 既存 */
-function fitRoute(coords){
-  if(coords.length<2) return;
-
-  const bounds=new maplibregl.LngLatBounds(coords[0],coords[0]);
-  coords.forEach(c=>bounds.extend(c));
-
-  map.fitBounds(bounds,{
-    padding:{
-      top:40,
-      bottom:isMobile?120:200,
-      left:40,
-      right:40
-    },
-    duration:600
-  });
-}
-
-/* ログイン */
-function login(){
-  if(atob(PW_HASH)!==pw.value){alert("違います");return;}
-
-  const auth=document.getElementById("auth");
-  const app=document.getElementById("app");
-
-  auth.style.opacity=0;
-  auth.style.transform="scale(1.05)";
-
-  setTimeout(()=>{
-    auth.style.display="none";
-    app.style.opacity=1;
-    app.style.transform="translateY(0) scale(1)";
-    init();
-  },500);
-}
-
-/* 初期化 */
+/* ===== 初期化 ===== */
 async function init(){
   await loadCSV();
 
@@ -237,121 +114,66 @@ async function init(){
     style:`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
     center:[135.15,34.75],
     zoom:6,
-    pixelRatio:window.devicePixelRatio > 2 ? 2 : window.devicePixelRatio
+    pixelRatio: window.devicePixelRatio > 2 ? 2 : window.devicePixelRatio
   });
 
   map.on('load',()=>{
-    map.resize();
     setupMap();
+    fitAll();
     renderSelected();
-
-    map.addSource('route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
-    map.addLayer({
-      id:'route',
-      type:'line',
-      source:'route',
-      paint:{'line-color':'#007aff','line-width':4}
-    });
-
-    /* ★ここが最重要 */
-    fitAllPoints();
   });
 
-  /* ★ 回転・画面サイズ変更対応 */
   window.addEventListener("resize",()=>map.resize());
 }
 
-/* CSV */
+/* ===== 全体フィット ===== */
+function fitAll(){
+  if(!onsens.length) return;
+
+  const bounds=new maplibregl.LngLatBounds();
+  onsens.forEach(o=>bounds.extend([o.lng,o.lat]));
+
+  map.fitBounds(bounds,{
+    padding:{
+      top:40,
+      bottom:120,
+      left:40,
+      right:40
+    },
+    duration:0
+  });
+}
+
+/* ===== CSV ===== */
 async function loadCSV(){
   const txt=await (await fetch("onsen.csv")).text();
   onsens=txt.split(/\n/).slice(1).map((l,i)=>{
     const c=l.split(",");
-    return {id:i,name:c[0],lat:+c[1],lng:+c[2],type:c[3]};
+    return {
+      id:i,
+      name:c[0],
+      lat:+c[1],
+      lng:+c[2]
+    };
   });
 }
 
-/* 地図 */
-const typeColor={
-  "塩化物泉":"#e74c3c",
-  "炭酸泉":"#3498db",
-  "単純温泉":"#95a5a6",
-  "含鉄泉":"#d35400"
-};
-
+/* ===== 地図 ===== */
 function setupMap(){
-  map.addSource('onsen',{type:'geojson',data:geo(),cluster:true});
-
-  map.addLayer({
-    id:'cluster',
-    type:'circle',
-    source:'onsen',
-    filter:['has','point_count'],
-    paint:{'circle-color':'#636e72','circle-radius':18}
-  });
-
-  map.addLayer({
-    id:'cluster-count',
-    type:'symbol',
-    source:'onsen',
-    filter:['has','point_count'],
-    layout:{'text-field':['get','point_count']},
-    paint:{'text-color':'#fff'}
-  });
+  map.addSource('onsen',{type:'geojson',data:geo()});
 
   map.addLayer({
     id:'points',
     type:'circle',
     source:'onsen',
-    filter:['!has','point_count'],
     paint:{
-      'circle-color':['get','color'],
-      'circle-radius':8
+      'circle-radius':8,
+      'circle-color':'#007aff'
     }
   });
-
-  map.addLayer({
-    id:'selected',
-    type:'circle',
-    source:'onsen',
-    filter:['in','id',-1],
-    paint:{
-      'circle-color':['get','color'],
-      'circle-radius':14,
-      'circle-stroke-width':3,
-      'circle-stroke-color':'#f1c40f'
-    }
-  });
-
-  map.addLayer({
-    id:'order',
-    type:'symbol',
-    source:'onsen',
-    filter:['in','id',-1],
-    layout:{'text-field':['get','order'],'text-size':12},
-    paint:{'text-color':'#fff'}
-  });
-
-  map.addLayer({
-    id:'label',
-    type:'symbol',
-    source:'onsen',
-    filter:['!has','point_count'],
-    layout:{'text-field':['get','name'],'text-size':10,'text-offset':[0,1.2]},
-    paint:{'text-color':'#000','text-halo-color':'#fff','text-halo-width':2}
-  });
-
-  map.moveLayer('selected');
-  map.moveLayer('order');
 
   map.on('click','points',e=>{
     toggle(e.features[0].properties.id);
-  });
-
-  map.on('click','cluster',e=>{
-    const f=map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
-    map.getSource('onsen').getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{
-      map.easeTo({center:f.geometry.coordinates,zoom});
-    });
   });
 }
 
@@ -360,111 +182,146 @@ function geo(){
     type:'FeatureCollection',
     features:onsens.map(o=>({
       type:'Feature',
-      geometry:{type:'Point',coordinates:[o.lng,o.lat]},
+      geometry:{
+        type:'Point',
+        coordinates:[o.lng,o.lat]
+      },
       properties:{
         id:o.id,
-        name:o.name,
-        color:typeColor[o.type]||'#7f8c8d',
-        order:selected.includes(o.id)?String(selected.indexOf(o.id)+1):""
+        name:o.name
       }
     }))
   };
 }
 
-function update(){
-  map.getSource('onsen').setData(geo());
-  map.setFilter('selected',['in','id',...selected]);
-  map.setFilter('order',['in','id',...selected]);
+/* ===== 選択処理 ===== */
+function toggle(i){
+  if(selected.includes(i)){
+    selected=selected.filter(x=>x!==i);
+  }else{
+    selected.push(i);
+  }
+  renderSelected();
 }
 
-/* ルート */
+/* ===== 並び替え ===== */
+function renderSelected(){
+  const el=document.getElementById("selected");
+  el.innerHTML="";
+
+  selected.forEach((i,idx)=>{
+    const d=document.createElement("div");
+    d.className="selected-item";
+    d.draggable=true;
+    d.dataset.index=idx;
+    d.innerText=onsens[i].name;
+
+    d.addEventListener("dragstart",e=>{
+      d.classList.add("dragging");
+      e.dataTransfer.setData("text/plain",idx);
+    });
+
+    d.addEventListener("dragend",()=>{
+      d.classList.remove("dragging");
+    });
+
+    d.addEventListener("dragover",e=>{
+      e.preventDefault();
+    });
+
+    d.addEventListener("drop",e=>{
+      e.preventDefault();
+
+      const from=+e.dataTransfer.getData("text");
+      const to=idx;
+
+      const moved=selected.splice(from,1)[0];
+      selected.splice(to,0,moved);
+
+      renderSelected();
+    });
+
+    el.appendChild(d);
+  });
+}
+
+/* ===== ルート描画（簡易） ===== */
 async function drawRoute(){
   if(selected.length<2)return;
-  showLoading(true);
 
-  const coordPairs=selected.map(i=>{
+  const coords=selected.map(i=>{
     const o=onsens[i];
-    return [o.lng,o.lat];
+    return `${o.lng},${o.lat}`;
   });
 
-  fitRoute(coordPairs);
+  const res=await fetch(`https://router.project-osrm.org/route/v1/driving/${coords.join(";")}?overview=full&geometries=geojson`);
+  const data=await res.json();
 
-  const coords=coordPairs.map(c=>c.join(','));
-
-  const data=await (await fetch(`https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson`)).json();
+  if(!map.getSource('route')){
+    map.addSource('route',{type:'geojson',data:{}});
+    map.addLayer({
+      id:'route',
+      type:'line',
+      source:'route',
+      paint:{'line-color':'#007aff','line-width':4}
+    });
+  }
 
   map.getSource('route').setData({
     type:'Feature',
     geometry:data.routes[0].geometry
   });
-
-  showLoading(false);
 }
 
-/* 最適化 */
-async function optimizeRoute(){
-  if(selected.length<2)return;
-  showLoading(true);
-
+/* ===== 最適化 ===== */
+function optimizeRoute(){
   selected.sort((a,b)=>onsens[a].lat-onsens[b].lat);
-  update();
-
-  await drawRoute();
-}
-
-/* UI */
-function renderSelected(){
-  if(isMobile) return;
-
-  const el=document.getElementById("selected");
-  el.innerHTML="";
-
-  selected.forEach(i=>{
-    const d=document.createElement("div");
-    d.className="selected-item";
-    d.innerHTML=`
-      <span>${onsens[i].name}</span>
-      <button onclick="removeItem(${i})">×</button>
-    `;
-    el.appendChild(d);
-  });
-}
-
-function removeItem(i){
-  selected=selected.filter(x=>x!==i);
-  update();
   renderSelected();
 }
 
-function toggle(i){
-  selected.includes(i)
-    ? selected=selected.filter(x=>x!==i)
-    : selected.push(i);
-
-  update();
-  renderSelected();
-}
-
+/* ===== 削除 ===== */
 function clearRoute(){
-  map.getSource('route').setData({type:'FeatureCollection',features:[]});
+  selected=[];
+  renderSelected();
+  if(map.getSource('route')){
+    map.getSource('route').setData({type:'FeatureCollection',features:[]});
+  }
 }
 
+/* ===== GoogleMap ===== */
+function generateRoute(){
+  if(!selected.length)return;
+
+  const names=selected.map(i=>onsens[i].name);
+
+  const origin=startFromCurrent
+    ? "Current+Location"
+    : encodeURIComponent(names[0]);
+
+  const destination=encodeURIComponent(names.at(-1));
+
+  const waypoints=names
+    .slice(1,-1)
+    .map(n=>encodeURIComponent(n))
+    .join("|");
+
+  let url=`https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+
+  if(waypoints){
+    url+=`&waypoints=${waypoints}`;
+  }
+
+  window.open(url);
+}
+
+/* ===== 現在地トグル ===== */
 function toggleStartMode(){
   startFromCurrent=!startFromCurrent;
   document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
 }
 
-function generateRoute(){
-  if(!selected.length)return;
-
-  const names=selected.map(i=>encodeURIComponent(onsens[i].name));
-
-  let url=startFromCurrent
-    ? `https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${names.at(-1)}&waypoints=${names.slice(0,-1).join('|')}`
-    : `https://www.google.com/maps/dir/?api=1&origin=${names[0]}&destination=${names.at(-1)}&waypoints=${names.slice(1,-1).join('|')}`;
-
-  window.open(url);
-}
+/* ===== 起動 ===== */
+init();
 
 </script>
 </body>
