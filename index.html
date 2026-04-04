@@ -139,6 +139,29 @@ button{
 .toggle-btn{background:#d1d1d6;}
 .toggle-btn.active{background:#34c759;color:#fff;}
 
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: center; /* 基本は中央 */
+  position: relative;
+}
+
+/* 中央グループ */
+.footer-center {
+  display: flex;
+  gap: 10px;
+  margin: 0 auto; /* 中央固定 */
+}
+
+/* 右グループ */
+.footer-right {
+  display: flex;
+  gap: 10px;
+  position: absolute;
+  right: 30px; /* ←ここで端からの距離を調整 */
+}
+
 /* モバイル */
 .mobile #map{
   height:100dvh;
@@ -146,6 +169,7 @@ button{
 .mobile .main{
   display:none;
 }
+
 </style>
 </head>
 
@@ -169,12 +193,18 @@ button{
   </div>
 
   <div class="footer">
-    <button onclick="drawRoute()" class="route-btn">ルート表示</button>
-    <button onclick="optimizeRoute()" class="opt-btn">ルート最適化</button>
-    <button onclick="clearRoute()" class="clear-btn">ルートリセット</button>
-    <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
-    <button id="toggleStart" class="toggle-btn" onclick="toggleStartMode()">現在地から検索</button>
+    <div class="footer-center">
+      <button onclick="drawRoute()" class="route-btn">ルートを表示</button>
+      <button onclick="optimizeRoute()" class="opt-btn">ルート最適化</button>
+      <button onclick="clearRoute()" class="clear-btn">ルートリセット</button>
+    </div>
+
+    <div class="footer-right">
+      <button onclick="generateRoute()" class="route-btn">GoogleMapでルート検索</button>
+      <button id="toggleStart" class="toggle-btn" onclick="toggleStartMode()">現在地から検索</button>
+    </div>
   </div>
+  
 </div>
 
 <script>
@@ -335,7 +365,7 @@ function setupMap(){
     type:'symbol',
     source:'onsen',
     filter:['!has','point_count'],
-    layout:{'text-field':['get','name'],'text-size':10,'text-offset':[0,1.2]},
+    layout:{'text-field':['get','name'],'text-size':14,'text-offset':[0,1.2]},
     paint:{'text-color':'#000','text-halo-color':'#fff','text-halo-width':2}
   });
 
