@@ -10,41 +10,40 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <style>
-body { margin:0; font-family:sans-serif; background:#f5f1e6; }
+body {
+  margin:0;
+  font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto;
+  background:#f4f6f8;
+  color:#333;
+}
 
 /* ===== マップ ===== */
 #map {
   position:fixed;
   top:0;
   width:100%;
-  height:66vh;
-  z-index:10;
+  height:65vh;
 }
 
 /* ===== メイン ===== */
 .main {
-  margin-top:66vh;
-  margin-bottom:90px;
-  padding:10px;
+  margin-top:65vh;
+  padding:12px;
 }
 
 .selected-container {
   background:#fff;
-  border-radius:12px;
-  padding:10px;
+  border-radius:14px;
+  padding:12px;
+  box-shadow:0 4px 12px rgba(0,0,0,0.08);
 }
 
-/* タイトル固定 */
 .selected-title {
-  font-weight:bold;
-  position:sticky;
-  top:0;
-  background:#fff;
-  padding-bottom:5px;
-  z-index:1;
+  font-weight:600;
+  font-size:14px;
+  margin-bottom:6px;
 }
 
-/* リストのみスクロール */
 .selected-list {
   max-height:30vh;
   overflow-y:auto;
@@ -52,10 +51,11 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
 
 .selected-item {
   padding:10px;
-  margin:5px 0;
-  background:#eee;
-  border-radius:8px;
+  margin:6px 0;
+  background:#eef2f6;
+  border-radius:10px;
   cursor:grab;
+  font-size:13px;
 }
 
 /* ===== フッター ===== */
@@ -64,33 +64,32 @@ body { margin:0; font-family:sans-serif; background:#f5f1e6; }
   bottom:0;
   width:100%;
   background:#fff;
-  border-top:1px solid #ccc;
+  border-top:1px solid #ddd;
   padding:10px;
   display:flex;
   justify-content:center;
-  align-items:center;
   gap:10px;
 }
 
 .route-btn {
-  padding:14px 24px;
-  font-size:16px;
-  background:#e67e22;
+  padding:12px 20px;
+  background:#2ecc71;
   color:#fff;
   border:none;
   border-radius:10px;
+  font-size:14px;
 }
 
 .toggle-btn {
-  padding:10px;
-  font-size:12px;
-  background:#ccc;
+  padding:10px 14px;
+  background:#bdc3c7;
   border:none;
-  border-radius:8px;
+  border-radius:10px;
+  font-size:12px;
 }
 
 .toggle-btn.active {
-  background:#e67e22;
+  background:#3498db;
   color:#fff;
 }
 </style>
@@ -154,7 +153,6 @@ async function initMap(){
   map.addControl(new maplibregl.NavigationControl());
 
   map.on('load', () => {
-    map.resize();
     setupSource();
     renderSelected();
   });
@@ -173,24 +171,17 @@ function setupSource(){
     clusterRadius:50
   });
 
-  const typeColor = [
-    'match',['get','type'],
-    '塩化物泉','#e74c3c',
-    '炭酸泉','#3498db',
-    '単純温泉','#7f8c8d',
-    '含鉄泉','#d2691e',
-    '#95a5a6'
-  ];
-
-  /* クラスタ */
+  /* ===== クラスタ（改善：濃色＋白文字） */
   map.addLayer({
     id:'clusters',
     type:'circle',
     source:'onsens',
     filter:['has','point_count'],
     paint:{
-      'circle-color':'#f3d7c1',
-      'circle-radius':['step',['get','point_count'],15,10,20,30,25]
+      'circle-color':'#2c3e50',
+      'circle-radius':['step',['get','point_count'],18,10,22,30,28],
+      'circle-stroke-width':2,
+      'circle-stroke-color':'#fff'
     }
   });
 
@@ -203,38 +194,38 @@ function setupSource(){
       'text-field':['get','point_count'],
       'text-size':12
     },
-    paint:{ 'text-color':'#000' }
+    paint:{ 'text-color':'#fff' }
   });
 
-  /* 単体 */
+  /* ===== 未選択 ===== */
   map.addLayer({
     id:'unclustered',
     type:'circle',
     source:'onsens',
     filter:['!has','point_count'],
     paint:{
-      'circle-color': typeColor,
-      'circle-radius':10,
-      'circle-stroke-width':2,
+      'circle-color':'#95a5a6',
+      'circle-radius':8,
+      'circle-stroke-width':1,
       'circle-stroke-color':'#fff'
     }
   });
 
-  /* 選択 */
+  /* ===== 選択（強調） ===== */
   map.addLayer({
     id:'selected',
     type:'circle',
     source:'onsens',
     filter:['in','id',-1],
     paint:{
-      'circle-color': typeColor,
+      'circle-color':'#e74c3c',
       'circle-radius':14,
       'circle-stroke-width':3,
-      'circle-stroke-color':'#fff'
+      'circle-stroke-color':'#f1c40f'
     }
   });
 
-  /* 番号 */
+  /* ===== 番号 ===== */
   map.addLayer({
     id:'labels',
     type:'symbol',
@@ -247,29 +238,22 @@ function setupSource(){
     paint:{ 'text-color':'#fff' }
   });
 
-  /* ===== 吹き出し（ズーム OR 選択） ===== */
+  /* ===== 名前（常時表示） ===== */
   map.addLayer({
     id:'name-label',
     type:'symbol',
     source:'onsens',
-    filter:[
-      'all',
-      ['!has','point_count'],
-      ['any',
-        ['>=',['zoom'],11],
-        ['in',['get','id'],['literal', selected]]
-      ]
-    ],
+    filter:['!has','point_count'],
     layout:{
       'text-field':['get','name'],
       'text-size':11,
-      'text-offset':[0.8,-0.8],
-      'text-anchor':'left'
+      'text-offset':[0,1.2],
+      'text-anchor':'top'
     },
     paint:{
-      'text-color':'#000',
-      'text-halo-color':'#fff',
-      'text-halo-width':4
+      'text-color':'#2c3e50',
+      'text-halo-color':'#ffffff',
+      'text-halo-width':3
     }
   });
 
@@ -303,7 +287,6 @@ function makeGeoJSON(){
       properties:{
         id:i,
         name:o.name,
-        type:o.type,
         order: selected.indexOf(i)>=0 ? String(selected.indexOf(i)+1) : ''
       }
     }))
@@ -313,19 +296,8 @@ function makeGeoJSON(){
 /* ===== 更新 ===== */
 function update(){
   map.getSource('onsens').setData(makeGeoJSON());
-
   map.setFilter('selected',['in','id',...selected]);
   map.setFilter('labels',['in','id',...selected]);
-
-  /* ラベル再適用（OR条件） */
-  map.setFilter('name-label',[
-    'all',
-    ['!has','point_count'],
-    ['any',
-      ['>=',['zoom'],11],
-      ['in',['get','id'],['literal', selected]]
-    ]
-  ]);
 }
 
 /* ===== UI ===== */
