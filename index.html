@@ -10,10 +10,12 @@
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
 <style>
+
+/* ★ 背景統一（ここが本質修正） */
 body{
   margin:0;
   font-family:-apple-system,BlinkMacSystemFont,sans-serif;
-  background:#0f172a;
+  background:#f2f2f7;
 }
 
 /* ===== 認証 ===== */
@@ -73,6 +75,7 @@ body{
   margin-top:65vh;
   padding:12px;
   background:#f2f2f7;
+  min-height:35vh; /* ★ 空白を埋める */
 }
 
 .selected-container{
@@ -117,6 +120,7 @@ button{
 
 .toggle-btn{ background:#d1d1d6;}
 .toggle-btn.active{ background:#34c759;color:#fff;}
+
 </style>
 </head>
 
@@ -152,7 +156,7 @@ button{
 <script>
 
 /* ===== 軽く隠したパスワード ===== */
-const PW_HASH = "b25zZW4="; // onsen (base64)
+const PW_HASH="b25zZW4=";
 function decode(s){ return atob(s); }
 
 const MAPTILER_KEY="5803br5MI3qRfp9DVSHL";
@@ -168,7 +172,7 @@ const typeColor={
 };
 
 function login(){
-  if(document.getElementById("pw").value !== decode(PW_HASH)){
+  if(document.getElementById("pw").value!==decode(PW_HASH)){
     alert("パスワード違います");
     return;
   }
@@ -220,9 +224,9 @@ async function loadCSV(){
   });
 }
 
-/* ===== 地図 ===== */
-function setup(){
+/* ===== 以下ロジックは変更なし ===== */
 
+function setup(){
   map.addSource('onsen',{type:'geojson',data:geo(),cluster:true});
 
   map.addLayer({
@@ -330,10 +334,8 @@ function update(){
   map.setFilter('order',['in','id',...selected]);
 }
 
-/* ===== 最適化 ===== */
 async function optimizeRoute(){
   if(selected.length<2) return;
-
   const rem=[...selected],res=[];
   let cur=rem.shift(); res.push(cur);
 
@@ -356,7 +358,6 @@ async function optimizeRoute(){
   await drawRoute();
 }
 
-/* ===== 高速ルート描画 ===== */
 async function drawRoute(){
 
   if(selected.length<2) return;
@@ -371,7 +372,7 @@ async function drawRoute(){
   const data=await res.json();
   const line=data.routes[0].geometry.coordinates;
 
-  const batchSize=20; // ★ 高速化
+  const batchSize=20;
   let i=0;
   const partial=[];
 
@@ -390,7 +391,6 @@ async function drawRoute(){
   step();
 }
 
-/* その他 */
 function toggle(i){
   selected.includes(i)
     ? selected=selected.filter(x=>x!==i)
