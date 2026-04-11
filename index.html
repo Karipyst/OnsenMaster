@@ -311,31 +311,51 @@ async function init(){
   map=new maplibregl.Map({
     container:'map',
     style:`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
-    center:[137.5,35.0],  // ★変更
-    zoom:4.8              // ★変更
+
+    // ★ 初期表示（安定版：本州＋九州が見える）
+    center:[137,36],
+    zoom:5
   });
 
   map.on('load',()=>{
     map.resize();
+
+    // ★ 先にデータ・レイヤー構築
     setupMap();
     renderSelected();
 
-    // ★推奨（fitBounds版）
-    map.fitBounds([
-      [129.0, 31.0],
-      [142.5, 41.5]
-    ],{
-      padding:20,
-      duration:0
+    // ★ ルートレイヤー
+    map.addSource('route',{
+      type:'geojson',
+      data:{type:'FeatureCollection',features:[]}
     });
 
-    map.addSource('route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
     map.addLayer({
       id:'route',
       type:'line',
       source:'route',
-      paint:{'line-color':'#007aff','line-width':4}
+      paint:{
+        'line-color':'#007aff',
+        'line-width':4
+      }
     });
+
+    // ★ 任意：日本全体にフィット（安全版）
+    // 必要な場合だけ有効化
+    /*
+    setTimeout(()=>{
+      map.fitBounds(
+        [
+          [130,31],  // 九州
+          [142,40]   // 東北
+        ],
+        {
+          padding:40,
+          duration:0
+        }
+      );
+    },0);
+    */
   });
 }
 
