@@ -115,45 +115,73 @@ body{
   border:none;
 }
 
-/* フッター */
+/* ===== フッター（完全置換） ===== */
 .footer{
   position:fixed;
-  bottom:env(safe-area-inset-bottom);
+  bottom:0;
+  left:0;
   width:100%;
-  padding:10px;
+
+  height:60px;
   display:flex;
-  justify-content:center;
-  gap:8px;
-  flex-wrap:wrap;
-  background:rgba(255,255,255,0.9);
+  justify-content:space-around;
+  align-items:center;
+
+  background:rgba(255,255,255,0.95);
   backdrop-filter:blur(20px);
-}
-/* 中央グループ */
-.footer-center {
-  display: flex;
-  gap: 10px;
-  margin: 0 auto; /* 中央固定 */
-}
+  border-top:1px solid #ddd;
 
-/* 右グループ */
-.footer-right {
-  display: flex;
-  gap: 10px;
-  position: absolute;
-  right: 30px; /* ←ここで端からの距離を調整 */
+  z-index:1000;
+
+  padding-bottom:env(safe-area-inset-bottom);
+  height:calc(60px + env(safe-area-inset-bottom));
 }
 
+/* アイコンボタン */
+.icon-btn{
+  flex:1;
+  height:100%;
 
-button{
-  padding:10px 14px;
-  border:none;border-radius:12px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+
+  border:none;
+  background:none;
+  padding:0;
+
+  font-size:10px;
+  color:#333;
 }
-.route-btn{background:#007aff;color:#fff;}
-.opt-btn{background:#34c759;color:#fff;}
-.clear-btn{background:#ff3b30;color:#fff;}
-.toggle-btn{background:#d1d1d6;}
-.toggle-btn.active{background:#34c759;color:#fff;}
 
+/* SVG */
+.icon-btn svg{
+  width:22px;
+  height:22px;
+  stroke:#333;
+  fill:none;
+  stroke-width:2;
+}
+
+/* ラベル */
+.icon-btn span{
+  margin-top:2px;
+}
+
+/* 状態色 */
+.icon-btn.active svg{
+  stroke:#34c759;
+}
+
+.route-btn svg{stroke:#007aff;}
+.opt-btn svg{stroke:#34c759;}
+.clear-btn svg{stroke:#ff3b30;}
+
+/* 極小画面はラベル消す */
+@media (max-width:400px){
+  .icon-btn span{display:none;}
+}
 
 /* モバイル */
 .mobile #map{
@@ -186,17 +214,43 @@ button{
   </div>
 
   <div class="footer">
-    <div class="footer-center">
-      <button onclick="drawRoute()" class="route-btn">ルート生成</button>
-      <button onclick="optimizeRoute()" class="opt-btn">最適化</button>
-      <button onclick="clearRoute()" class="clear-btn">リセット</button>
-    </div>
 
-    <div class="footer-right">
-      <button onclick="generateRoute()" class="route-btn">GoogleMap</button>
-      <button id="toggleStart" class="toggle-btn" onclick="toggleStartMode()">現在地</button>
-    </div>
-  </div>
+  <button onclick="drawRoute()" class="icon-btn route-btn">
+    <svg viewBox="0 0 24 24">
+      <path d="M3 12h18M12 3l9 9-9 9"/>
+    </svg>
+    <span>ルート</span>
+  </button>
+
+  <button onclick="optimizeRoute()" class="icon-btn opt-btn">
+    <svg viewBox="0 0 24 24">
+      <path d="M4 6h16M4 12h10M4 18h7"/>
+    </svg>
+    <span>最適化</span>
+  </button>
+
+  <button onclick="clearRoute()" class="icon-btn clear-btn">
+    <svg viewBox="0 0 24 24">
+      <path d="M3 6h18M8 6v12M16 6v12"/>
+    </svg>
+    <span>リセット</span>
+  </button>
+
+  <button onclick="generateRoute()" class="icon-btn route-btn">
+    <svg viewBox="0 0 24 24">
+      <path d="M4 4h16v16H4zM8 12h8"/>
+    </svg>
+    <span>Google</span>
+  </button>
+
+  <button id="toggleStart" class="icon-btn toggle-btn" onclick="toggleStartMode()">
+    <svg viewBox="0 0 24 24">
+      <path d="M12 2v20M2 12h20"/>
+    </svg>
+    <span>現在地</span>
+  </button>
+
+</div>
   
 </div>
 
