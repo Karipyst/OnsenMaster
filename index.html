@@ -311,14 +311,23 @@ async function init(){
   map=new maplibregl.Map({
     container:'map',
     style:`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
-    center:[135.15,34.75],
-    zoom:6
+    center:[137.5,35.0],  // ★変更
+    zoom:4.8              // ★変更
   });
 
   map.on('load',()=>{
     map.resize();
     setupMap();
     renderSelected();
+
+    // ★推奨（fitBounds版）
+    map.fitBounds([
+      [129.0, 31.0],
+      [142.5, 41.5]
+    ],{
+      padding:20,
+      duration:0
+    });
 
     map.addSource('route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
     map.addLayer({
@@ -327,21 +336,6 @@ async function init(){
       source:'route',
       paint:{'line-color':'#007aff','line-width':4}
     });
-  });
-}
-
-/* CSV */
-async function loadCSV(){
-  const txt=await (await fetch("onsen.csv")).text();
-  onsens = txt.split(/\n/).slice(1).map((l,i)=>{
-    const c = l.split(",");
-    return {
-      id: i,
-      name: c[0],
-      lat: +c[1],
-      lng: +c[2],
-      type: (c[3] || "").trim()
-    };
   });
 }
 
