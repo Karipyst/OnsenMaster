@@ -431,9 +431,19 @@ function setupMap(){
   map.moveLayer('selected');
   map.moveLayer('order');
 
-  map.on('click','points',e=>{
-    toggle(e.features[0].properties.id);
-  });
+  map.on('click', (e)=>{
+  const features = map.queryRenderedFeatures(
+    [
+      [e.point.x - 10, e.point.y - 10],
+      [e.point.x + 10, e.point.y + 10]
+    ],
+    { layers:['points'] }
+  );
+
+  if(features.length){
+    toggle(features[0].properties.id);
+  }
+});
 
   map.on('click','cluster',e=>{
     const f=map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
