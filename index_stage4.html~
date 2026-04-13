@@ -748,7 +748,7 @@ async function init(){
 }
 
 async function loadCSV(){
-  const txt = await (await fetch("onsen.csv")).text();
+  const txt = await (await fetch("onsen_stage4.csv")).text();
   onsens = parseCSV(txt).map((row, i) => ({
     id: i,
     name: (row.name || "").trim(),

@@ -391,147 +391,6 @@ button,input,select{font:inherit;}
   font-size:14px;
 }
 
-
-
-/* 詳細シート */
-.detail-sheet{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:1600;
-  background:rgba(255,255,255,.98);
-  backdrop-filter:blur(18px);
-  border-top-left-radius:24px;
-  border-top-right-radius:24px;
-  box-shadow:0 -16px 40px rgba(15,23,42,.18);
-  transform:translateY(calc(100% + 24px));
-  transition:transform .35s ease;
-  max-height:min(72dvh, 640px);
-  display:flex;
-  flex-direction:column;
-}
-.detail-sheet.open{transform:translateY(0);}
-.detail-overlay{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.2);
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .25s ease;
-  z-index:1550;
-}
-.detail-overlay.show{
-  opacity:1;
-  pointer-events:auto;
-}
-.detail-head{
-  position:sticky;
-  top:0;
-  background:linear-gradient(rgba(255,255,255,.98), rgba(255,255,255,.95));
-  padding:10px 16px 8px;
-  border-bottom:1px solid #eef2f7;
-}
-.detail-handle{
-  width:44px;
-  height:5px;
-  background:#d1d5db;
-  border-radius:999px;
-  margin:0 auto 10px;
-}
-.detail-title-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-}
-.detail-title{
-  font-size:20px;
-  font-weight:800;
-  margin:0;
-}
-.detail-close{
-  width:38px;
-  height:38px;
-  border:none;
-  border-radius:12px;
-  background:#f3f4f6;
-  cursor:pointer;
-  font-size:20px;
-}
-.detail-body{
-  overflow-y:auto;
-  padding:16px 16px calc(22px + env(safe-area-inset-bottom));
-}
-.detail-badges{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin:10px 0 14px;
-}
-.detail-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  height:32px;
-  padding:0 12px;
-  border-radius:999px;
-  background:#f8fafc;
-  border:1px solid #e5e7eb;
-  font-size:13px;
-}
-.detail-section{
-  background:#f8fafc;
-  border:1px solid #eef2f7;
-  border-radius:16px;
-  padding:14px;
-  margin-bottom:12px;
-}
-.detail-section h4{
-  margin:0 0 10px;
-  font-size:14px;
-}
-.detail-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-.detail-field{
-  min-width:0;
-}
-.detail-label{
-  display:block;
-  font-size:12px;
-  color:var(--sub);
-  margin-bottom:5px;
-}
-.detail-value{
-  font-size:14px;
-  color:#111827;
-  line-height:1.55;
-  word-break:break-word;
-}
-.detail-actions{
-  display:flex;
-  gap:10px;
-  margin-top:16px;
-}
-.detail-link{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:100%;
-  height:42px;
-  border-radius:12px;
-  background:#111827;
-  color:#fff;
-  text-decoration:none;
-  font-weight:700;
-}
-@media (max-width:520px){
-  .detail-grid{grid-template-columns:1fr;}
-}
-
 /* 極小画面 */
 @media (max-width:400px){
   .icon-btn span{display:none;}
@@ -604,21 +463,6 @@ button,input,select{font:inherit;}
       <div id="selected"></div>
     </div>
   </div>
-
-
-
-  <div id="detailOverlay" class="detail-overlay" onclick="closeDetail()"></div>
-  <section id="detailSheet" class="detail-sheet" aria-hidden="true">
-    <div class="detail-head">
-      <div class="detail-handle"></div>
-      <div class="detail-title-row">
-        <h3 id="detailTitle" class="detail-title">温泉詳細</h3>
-        <button class="detail-close" onclick="closeDetail()" aria-label="詳細を閉じる">×</button>
-      </div>
-    </div>
-    <div id="detailBody" class="detail-body"></div>
-  </section>
-
 
   <div class="footer">
     <button onclick="drawRoute()" class="icon-btn route-btn" aria-label="ルート表示">
@@ -748,7 +592,7 @@ async function init(){
 }
 
 async function loadCSV(){
-  const txt = await (await fetch("onsen.csv")).text();
+  const txt = await (await fetch("onsen_stage3.csv")).text();
   onsens = parseCSV(txt).map((row, i) => ({
     id: i,
     name: (row.name || "").trim(),
@@ -901,8 +745,7 @@ function setupMap(){
     );
 
     if(features.length){
-      const id = Number(features[0].properties.id);
-      toggle(id, {showDetail:true, focus:false});
+      toggle(Number(features[0].properties.id));
     }
   });
 
@@ -982,12 +825,12 @@ function renderSelected(){
   el.innerHTML = selected.map(i => {
     const o = onsens[i];
     return `
-      <div class="selected-item" onclick="showDetail(${i})" role="button" tabindex="0">
+      <div class="selected-item">
         <div class="selected-item-info">
           <div class="selected-item-title">${escapeHTML(o.name)}</div>
           <div class="selected-item-meta">${escapeHTML(o.type || "泉質未設定")} / ${escapeHTML(formatPrice(o.price))}</div>
         </div>
-        <button class="remove-btn" onclick="event.stopPropagation(); removeItem(${i})" aria-label="${escapeAttr(o.name)} を削除">×</button>
+        <button class="remove-btn" onclick="removeItem(${i})" aria-label="${escapeAttr(o.name)} を削除">×</button>
       </div>
     `;
   }).join("");
@@ -1048,20 +891,19 @@ function renderOnsenList(){
         </div>
 
         <div class="onsen-actions">
-          <button class="ghost-btn" onclick="focusOnsen(${o.id}); showDetail(${o.id});">地図へ</button>
-          <button class="ghost-btn" onclick="showDetail(${o.id})">詳細</button>
-          <button class="${selectedClass}" onclick="toggle(${o.id}, {showDetail:true})">${selectedLabel}</button>
+          <button class="ghost-btn" onclick="focusOnsen(${o.id})">地図へ</button>
+          <button class="${selectedClass}" onclick="toggle(${o.id})">${selectedLabel}</button>
         </div>
       </article>
     `;
   }).join("");
 }
 
-function focusOnsen(id, closeMenuAfter = true){
+function focusOnsen(id){
   const o = onsens.find(x => x.id === id);
   if(!o || !map) return;
   map.easeTo({ center:[o.lng, o.lat], zoom: 11, duration: 700 });
-  if(closeMenuAfter) closeMenu();
+  closeMenu();
 }
 
 function removeItem(i){
@@ -1069,19 +911,13 @@ function removeItem(i){
   update();
 }
 
-function toggle(i, options = {}){
-  const { showDetail: shouldShowDetail = false, focus = false } = options;
-
+function toggle(i){
   if(selected.includes(i)){
     selected = selected.filter(x => x !== i);
   }else{
     selected.push(i);
   }
-
   update();
-
-  if(focus) focusOnsen(i, false);
-  if(shouldShowDetail) showDetail(i);
 }
 
 function clearRoute(){
@@ -1120,72 +956,6 @@ function closeMenu(){
   document.getElementById("sideMenu").setAttribute("aria-hidden", "true");
 }
 
-
-function showDetail(id){
-  const o = onsens.find(x => x.id === id);
-  if(!o) return;
-
-  const body = document.getElementById("detailBody");
-  const title = document.getElementById("detailTitle");
-  const selectedNow = selected.includes(id);
-
-  title.textContent = o.name;
-  body.innerHTML = `
-    <div class="detail-badges">
-      <span class="detail-badge">
-        <span class="onsen-type-dot" style="background:${typeColor[o.type] || '#7f8c8d'}"></span>
-        <span>${escapeHTML(o.type || '泉質未設定')}</span>
-      </span>
-      <span class="detail-badge">価格: ${escapeHTML(formatPrice(o.price))}</span>
-      <span class="detail-badge">評価: ${escapeHTML(formatRating(o.rating))}</span>
-      <span class="detail-badge">${selectedNow ? '選択中' : '未選択'}</span>
-    </div>
-
-    <section class="detail-section">
-      <h4>概要</h4>
-      <div class="detail-value">${escapeHTML(o.description || o.review || '詳細説明は未設定です。')}</div>
-    </section>
-
-    <section class="detail-section">
-      <h4>基本情報</h4>
-      <div class="detail-grid">
-        <div class="detail-field">
-          <span class="detail-label">レビュー</span>
-          <div class="detail-value">${escapeHTML(o.review || '未設定')}</div>
-        </div>
-        <div class="detail-field">
-          <span class="detail-label">営業時間</span>
-          <div class="detail-value">${escapeHTML(o.hours || '未設定')}</div>
-        </div>
-        <div class="detail-field">
-          <span class="detail-label">住所</span>
-          <div class="detail-value">${escapeHTML(o.address || '未設定')}</div>
-        </div>
-        <div class="detail-field">
-          <span class="detail-label">座標</span>
-          <div class="detail-value">${o.lat.toFixed(6)}, ${o.lng.toFixed(6)}</div>
-        </div>
-      </div>
-
-      <div class="detail-actions">
-        <button class="ghost-btn" onclick="focusOnsen(${id}, false)">地図へ移動</button>
-        <button class="${selectedNow ? 'solid-btn is-selected' : 'solid-btn'}" onclick="toggle(${id}, {showDetail:true})">${selectedNow ? '選択解除' : 'ルートに追加'}</button>
-      </div>
-      ${o.url ? `<div class="detail-actions"><a class="detail-link" href="${escapeAttr(o.url)}" target="_blank" rel="noopener noreferrer">公式サイトを開く</a></div>` : ''}
-    </section>
-  `;
-
-  document.getElementById("detailSheet").classList.add("open");
-  document.getElementById("detailOverlay").classList.add("show");
-  document.getElementById("detailSheet").setAttribute("aria-hidden", "false");
-}
-
-function closeDetail(){
-  document.getElementById("detailSheet").classList.remove("open");
-  document.getElementById("detailOverlay").classList.remove("show");
-  document.getElementById("detailSheet").setAttribute("aria-hidden", "true");
-}
-
 function formatPrice(value){
   const n = Number(String(value).replace(/[^\d.]/g, ""));
   if(!Number.isFinite(n) || !value) return "未設定";
@@ -1222,10 +992,7 @@ function escapeAttr(value){
 }
 
 document.addEventListener("keydown", (e) => {
-  if(e.key === "Escape"){
-    closeMenu();
-    closeDetail();
-  }
+  if(e.key === "Escape") closeMenu();
 });
 </script>
 </body>
