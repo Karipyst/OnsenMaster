@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>温泉マップ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,sans-serif;
+  background:#f2f2f7;
+}
+
+/* ローディング */
+#loading{
+  position:fixed;inset:0;
+  display:flex;justify-content:center;align-items:center;
+  background:rgba(0,0,0,0.25);
+  opacity:0;pointer-events:none;transition:.3s;
+  z-index:20;
+}
+#loading.active{opacity:1;pointer-events:auto;}
+.spinner{
+  width:40px;height:40px;
+  border:4px solid #fff;border-top:4px solid transparent;
+  border-radius:50%;animation:spin 1s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* 認証 */
+#auth{
+  position:fixed;
+  inset:0;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  background:linear-gradient(135deg,#0f172a,#1e293b);
+  z-index:10;
+  transition:.6s;
+}
+
+.auth-card{
+  backdrop-filter:blur(20px);
+  background:rgba(255,255,255,0.1);
+  padding:30px;
+  border-radius:20px;
+  width:260px;
+  text-align:center;
+}
+
+.auth-card input,
+.auth-card button{
+  width:100%;
+  box-sizing:border-box;
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  margin-bottom:10px;
+  font-size:14px;
+}
+
+.auth-card button{
+  background:#34c759;
+  color:#fff;
+}
+
+/* 本体 */
+#app{
+  position:fixed;
+  inset:0;
+  opacity:0;
+  transform:translateY(20px) scale(.98);
+  transition:opacity .6s ease, transform .6s ease;
+}
+
+/* マップ */
+#map{
+  position:fixed;
+  top:0;
+  width:100%;
+  height:65vh;
+}
+
+/* PCリスト */
+.main{
+  margin-top:65vh;
+  padding:12px;
+}
+
+#selected{
+  max-height:220px;
+  overflow-y:auto;
+}
+
+.selected-item{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  padding:10px;
+  margin:6px 0;
+  background:#fff;
+  border-radius:10px;
+  transition:.25s;
+}
+
+.remove-btn{
+  width:26px;height:26px;
+  border-radius:50%;
+  background:#e5e5ea;
+  display:flex;align-items:center;justify-content:center;
+  border:none;
+}
+
+/* ===== フッター（完全置換） ===== */
+.footer{
+  position:fixed;
+  bottom:0;
+  left:0;
+  width:100%;
+
+  height:60px;
+  display:flex;
+  justify-content:space-around;
+  align-items:center;
+
+  background:rgba(255,255,255,0.95);
+  backdrop-filter:blur(20px);
+  border-top:1px solid #ddd;
+
+  z-index:1000;
+
+  padding-bottom:env(safe-area-inset-bottom);
+  height:calc(60px + env(safe-area-inset-bottom));
+}
+
+/* アイコンボタン */
+.icon-btn{
+  flex:1;
+  height:100%;
+
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+
+  border:none;
+  background:none;
+  padding:0;
+
+  font-size:10px;
+  color:#333;
+}
+
+/* SVG */
+.icon-btn svg{
+  width:22px;
+  height:22px;
+  stroke:#333;
+  fill:none;
+  stroke-width:2;
+}
+
+/* ラベル */
+.icon-btn span{
+  margin-top:2px;
+}
+
+/* 状態色 */
+.icon-btn.active svg{
+  stroke:#34c759;
+}
+
+.route-btn svg{stroke:#007aff;}
+.opt-btn svg{stroke:#34c759;}
+.clear-btn svg{stroke:#ff3b30;}
+
+/* 極小画面はラベル消す */
+@media (max-width:400px){
+  .icon-btn span{display:none;}
+}
+
+/* モバイル */
+.mobile #map{
+  height:100dvh;
+}
+.mobile .main{
+  display:none;
+}
+
+</style>
+</head>
+
+<body>
+
+<div id="loading"><div class="spinner"></div></div>
+
+<div id="auth">
+  <div class="auth-card">
+    <h3 style="color:white;">Sommelier Map</h3>
+    <input type="password" id="pw">
+    <button onclick="login()">ログイン</button>
+  </div>
+</div>
+
+<div id="app">
+  <div id="map"></div>
+
+  <div class="main">
+    <div id="selected"></div>
+  </div>
+
+  <div class="footer">
+
+  <button onclick="drawRoute()" class="icon-btn route-btn">
+    <svg viewBox="0 0 24 24">
+      <path d="M3 12h18M12 3l9 9-9 9"/>
+    </svg>
+    <span>ルート</span>
+  </button>
+
+  <button onclick="optimizeRoute()" class="icon-btn opt-btn">
+    <svg viewBox="0 0 24 24">
+      <path d="M4 6h16M4 12h10M4 18h7"/>
+    </svg>
+    <span>最適化</span>
+  </button>
+
+  <button onclick="clearRoute()" class="icon-btn clear-btn">
+    <svg viewBox="0 0 24 24">
+      <path d="M3 6h18M8 6v12M16 6v12"/>
+    </svg>
+    <span>リセット</span>
+  </button>
+
+  <button onclick="generateRoute()" class="icon-btn route-btn">
+    <svg viewBox="0 0 24 24">
+      <path d="M4 4h16v16H4zM8 12h8"/>
+    </svg>
+    <span>Google</span>
+  </button>
+
+  <button id="toggleStart" class="icon-btn toggle-btn" onclick="toggleStartMode()">
+    <svg viewBox="0 0 24 24">
+      <path d="M12 2v20M2 12h20"/>
+    </svg>
+    <span>現在地</span>
+  </button>
+
+</div>
+  
+</div>
+
+<script>
+
+const isMobile = window.matchMedia("(pointer: coarse)").matches;
+if(isMobile) document.body.classList.add("mobile");
+
+const PW_HASH="b25zZW4=";
+const MAPTILER_KEY="5803br5MI3qRfp9DVSHL";
+
+let map,onsens=[],selected=[],startFromCurrent=false;
+
+function showLoading(v){
+  document.getElementById("loading").classList.toggle("active",v);
+}
+
+/* ★ 追加：fit処理 */
+function fitRoute(coords){
+  if(coords.length<2) return;
+
+  const bounds=new maplibregl.LngLatBounds(coords[0],coords[0]);
+  coords.forEach(c=>bounds.extend(c));
+
+  map.fitBounds(bounds,{
+    padding:{
+      top:40,
+      bottom:isMobile?120:200,
+      left:40,
+      right:40
+    },
+    duration:600
+  });
+}
+
+/* ログイン */
+function login(){
+  if(atob(PW_HASH)!==pw.value){alert("パスワードが違います");return;}
+
+  const auth=document.getElementById("auth");
+  const app=document.getElementById("app");
+
+  auth.style.opacity=0;
+  auth.style.transform="scale(1.05)";
+
+  setTimeout(()=>{
+    auth.style.display="none";
+    app.style.opacity=1;
+    app.style.transform="translateY(0) scale(1)";
+    init();
+  },500);
+}
+
+/* 初期化 */
+async function init(){
+  await loadCSV();
+
+  map=new maplibregl.Map({
+    container:'map',
+    style:`https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
+    center:[137,36],
+    zoom:5
+  });
+
+  map.on('load',()=>{
+    map.resize();
+    setupMap();
+    renderSelected();
+
+    map.addSource('route',{type:'geojson',data:{type:'FeatureCollection',features:[]}});
+    map.addLayer({
+      id:'route',
+      type:'line',
+      source:'route',
+      paint:{'line-color':'#007aff','line-width':4}
+    });
+  });
+}
+
+/* CSV */
+async function loadCSV(){
+  const txt=await (await fetch("onsen.csv")).text();
+  onsens = txt.split(/\n/).slice(1).map((l,i)=>{
+    const c = l.split(",");
+    return {
+      id: i,
+      name: c[0],
+      lat: +c[1],
+      lng: +c[2],
+      type: (c[3] || "").trim()
+    };
+  });
+}
+
+/* 地図 */
+const typeColor = {
+  "銭湯": "#7f8c8d",          // グレー（中立）
+  "単純温泉": "#87ceeb",      // スカイブルー
+  "塩化物泉": "#e74c3c",      // 既存（赤）
+  "炭酸水素塩泉": "#1abc9c",  // ターコイズ（肌すべ感）
+  "硫酸塩泉": "#9b59b6",      // 紫（落ち着き）
+  "二酸化炭素泉": "#3498db",  // 既存の炭酸泉を統一
+  "含鉄泉": "#d35400",        // 既存（赤茶）
+  "硫黄泉": "#f1c40f",        // 黄色（硫黄）
+  "酸性泉": "#e84393",        // ピンク（刺激）
+  "放射能泉": "#27ae60",      // 緑（特殊系）
+  "含よう素泉": "#e67e22"     // オレンジ（ヨード）
+};
+
+function setupMap(){
+  map.addSource('onsen',{
+    type:'geojson',
+    data:geo(),
+    cluster:true,
+    clusterMaxZoom:10,  // ← 早めに分離（重要）
+    clusterRadius:40    // ← 少し分離しやすく
+  });
+
+  map.addLayer({
+    id:'cluster',
+    type:'circle',
+    source:'onsen',
+    filter:['has','point_count'],
+    paint:{'circle-color':'#636e72','circle-radius':18}
+  });
+
+  map.addLayer({
+    id:'cluster-count',
+    type:'symbol',
+    source:'onsen',
+    filter:['has','point_count'],
+    layout:{'text-field':['get','point_count']},
+    paint:{'text-color':'#fff'}
+  });
+
+  map.addLayer({
+    id:'points',
+    type:'circle',
+    source:'onsen',
+    filter:['!has','point_count'],
+    paint:{
+      'circle-color':['get','color'],
+      'circle-radius':8
+    }
+  });
+
+  map.addLayer({
+    id:'selected',
+    type:'circle',
+    source:'onsen',
+    filter:['in','id',-1],
+    paint:{
+      'circle-color':['get','color'],
+      'circle-radius':14,
+      'circle-stroke-width':3,
+      'circle-stroke-color':'#f1c40f'
+    }
+  });
+
+  map.addLayer({
+    id:'order',
+    type:'symbol',
+    source:'onsen',
+    filter:['in','id',-1],
+    layout:{'text-field':['get','order'],'text-size':14},
+    paint:{'text-color':'#fff'}
+  });
+
+  map.addLayer({
+    id:'label',
+    type:'symbol',
+    source:'onsen',
+    filter:['!has','point_count'],
+    layout:{'text-field':['get','name'],'text-size':14,'text-offset':[0,1.2]},
+    paint:{'text-color':'#000','text-halo-color':'#fff','text-halo-width':2}
+  });
+
+  map.moveLayer('selected');
+  map.moveLayer('order');
+
+  map.on('click', (e)=>{
+  const features = map.queryRenderedFeatures(
+    [
+      [e.point.x - 10, e.point.y - 10],
+      [e.point.x + 10, e.point.y + 10]
+    ],
+    { layers:['points'] }
+  );
+
+  if(features.length){
+    toggle(features[0].properties.id);
+  }
+});
+
+  map.on('click','cluster',e=>{
+    const f=map.queryRenderedFeatures(e.point,{layers:['cluster']})[0];
+    map.getSource('onsen').getClusterExpansionZoom(f.properties.cluster_id,(err,zoom)=>{
+      map.easeTo({center:f.geometry.coordinates,zoom});
+    });
+  });
+}
+
+function geo(){
+  return{
+    type:'FeatureCollection',
+    features:onsens.map(o=>({
+      type:'Feature',
+      geometry:{type:'Point',coordinates:[o.lng,o.lat]},
+      properties:{
+        id:o.id,
+        name:o.name,
+        color:typeColor[o.type]||'#7f8c8d',
+        order:selected.includes(o.id)?String(selected.indexOf(o.id)+1):""
+      }
+    }))
+  };
+}
+
+function update(){
+  map.getSource('onsen').setData(geo());
+  map.setFilter('selected',['in','id',...selected]);
+  map.setFilter('order',['in','id',...selected]);
+}
+
+/* ルート */
+async function drawRoute(){
+  if(selected.length<2)return;
+  showLoading(true);
+
+  const coordPairs=selected.map(i=>{
+    const o=onsens[i];
+    return [o.lng,o.lat];
+  });
+
+  fitRoute(coordPairs); // ★ここだけ追加
+
+  const coords=coordPairs.map(c=>c.join(','));
+
+  const data=await (await fetch(`https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson`)).json();
+
+  map.getSource('route').setData({
+    type:'Feature',
+    geometry:data.routes[0].geometry
+  });
+
+  showLoading(false);
+}
+
+/* 最適化 */
+async function optimizeRoute(){
+  if(selected.length<2)return;
+  showLoading(true);
+
+  selected.sort((a,b)=>onsens[a].lat-onsens[b].lat);
+  update();
+
+  await drawRoute();
+}
+
+/* UI */
+function renderSelected(){
+  if(isMobile) return;
+
+  const el=document.getElementById("selected");
+  el.innerHTML="";
+
+  selected.forEach(i=>{
+    const d=document.createElement("div");
+    d.className="selected-item";
+    d.innerHTML=`
+      <span>${onsens[i].name}</span>
+      <button class="remove-btn" onclick="removeItem(${i})">×</button>
+    `;
+    el.appendChild(d);
+  });
+}
+
+function removeItem(i){
+  selected=selected.filter(x=>x!==i);
+  update();
+  renderSelected();
+}
+
+function toggle(i){
+  selected.includes(i)
+    ? selected=selected.filter(x=>x!==i)
+    : selected.push(i);
+
+  update();
+  renderSelected();
+}
+
+function clearRoute(){
+  map.getSource('route').setData({type:'FeatureCollection',features:[]});
+}
+
+function toggleStartMode(){
+  startFromCurrent=!startFromCurrent;
+  document.getElementById("toggleStart").classList.toggle("active",startFromCurrent);
+}
+
+function generateRoute(){
+  if(!selected.length)return;
+
+  const names=selected.map(i=>encodeURIComponent(onsens[i].name));
+
+  let url=startFromCurrent
+    ? `https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${names.at(-1)}&waypoints=${names.slice(0,-1).join('|')}`
+    : `https://www.google.com/maps/dir/?api=1&origin=${names[0]}&destination=${names.at(-1)}&waypoints=${names.slice(1,-1).join('|')}`;
+
+  window.open(url);
+}
+
+</script>
+</body>
+</html>
