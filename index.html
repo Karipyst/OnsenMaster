@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>温泉マップ</title>
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
 
 <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
 <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
@@ -17,19 +17,21 @@
   --sub:#6b7280;
   --card-bg:rgba(255,255,255,.14);
   --border:rgba(255,255,255,.18);
+  --sheet-translate:calc(100% + 24px);
 }
 
-*{box-sizing:border-box;}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;}
 body{
   margin:0;
   font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI",sans-serif;
   background:#f2f2f7;
   color:var(--text);
+  overflow:hidden;
 }
 button,input,select{font:inherit;}
+button{touch-action:manipulation;}
 
-/* ローディング */
 #loading{
   position:fixed;inset:0;
   display:flex;justify-content:center;align-items:center;
@@ -45,7 +47,6 @@ button,input,select{font:inherit;}
 }
 @keyframes spin{to{transform:rotate(360deg);}}
 
-/* 認証 */
 #auth{
   position:fixed;
   inset:0;
@@ -58,7 +59,6 @@ button,input,select{font:inherit;}
   z-index:1000;
   transition:.6s;
 }
-
 .auth-card{
   backdrop-filter:blur(20px);
   background:var(--card-bg);
@@ -69,45 +69,21 @@ button,input,select{font:inherit;}
   text-align:center;
   box-shadow:0 20px 60px rgba(0,0,0,.22);
 }
-.auth-card h3{
-  margin:0 0 8px;
-  color:#fff;
-  font-size:26px;
-}
-.auth-card p{
-  margin:0 0 20px;
-  color:rgba(255,255,255,.84);
-  font-size:14px;
-}
-.auth-card form{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
+.auth-card h3{margin:0 0 8px;color:#fff;font-size:26px;}
+.auth-card p{margin:0 0 20px;color:rgba(255,255,255,.84);font-size:14px;}
+.auth-card form{display:flex;flex-direction:column;gap:10px;}
 .auth-card input,
 .auth-card button{
   width:100%;
   padding:13px 14px;
   border-radius:12px;
   border:none;
-  font-size:15px;
+  font-size:16px;
 }
-.auth-card input{
-  background:rgba(255,255,255,.92);
-}
-.auth-card button{
-  background:var(--accent);
-  color:#fff;
-  font-weight:700;
-  cursor:pointer;
-}
-.auth-card .auth-hint{
-  margin-top:10px;
-  color:rgba(255,255,255,.75);
-  font-size:12px;
-}
+.auth-card input{background:rgba(255,255,255,.92);}
+.auth-card button{background:var(--accent);color:#fff;font-weight:700;cursor:pointer;}
+.auth-card .auth-hint{margin-top:10px;color:rgba(255,255,255,.75);font-size:12px;}
 
-/* 本体 */
 #app{
   position:fixed;
   inset:0;
@@ -115,478 +91,207 @@ button,input,select{font:inherit;}
   transform:translateY(20px) scale(.98);
   transition:opacity .6s ease, transform .6s ease;
 }
-
-/* マップ */
-#map{
-  position:fixed;
-  top:0;
-  width:100%;
-  height:65vh;
-}
-
-/* PC下部リスト */
-.main{
-  margin-top:65vh;
-  padding:12px 12px calc(80px + env(safe-area-inset-bottom));
-}
-.selected-panel{
-  background:#fff;
-  border-radius:16px;
-  box-shadow:0 8px 28px rgba(15,23,42,.08);
-  padding:12px;
-}
-.selected-title{
-  font-size:14px;
-  font-weight:700;
-  margin-bottom:10px;
-}
-#selected{
-  max-height:220px;
-  overflow-y:auto;
-}
-.empty-note{
-  color:var(--sub);
-  font-size:14px;
-  padding:8px 4px;
-}
-.selected-item{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-  padding:10px;
-  margin:6px 0;
-  background:#f8fafc;
-  border-radius:12px;
-  transition:.25s;
-}
+#map{position:fixed;top:0;width:100%;height:65vh;}
+.main{margin-top:65vh;padding:12px 12px calc(80px + env(safe-area-inset-bottom));}
+.selected-panel{background:#fff;border-radius:16px;box-shadow:0 8px 28px rgba(15,23,42,.08);padding:12px;}
+.selected-title{font-size:14px;font-weight:700;margin-bottom:10px;}
+#selected{max-height:220px;overflow-y:auto;}
+.empty-note{color:var(--sub);font-size:14px;padding:8px 4px;}
+.selected-item{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px;margin:6px 0;background:#f8fafc;border-radius:12px;transition:.25s;cursor:pointer;}
 .selected-item-info{display:flex;flex-direction:column;gap:3px;min-width:0;}
 .selected-item-title{font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .selected-item-meta{font-size:12px;color:var(--sub);}
-.remove-btn{
-  width:28px;height:28px;
-  min-width:28px;
-  border-radius:50%;
-  background:#e5e7eb;
-  display:flex;align-items:center;justify-content:center;
-  border:none;
-  cursor:pointer;
-}
+.remove-btn{width:28px;height:28px;min-width:28px;border-radius:50%;background:#e5e7eb;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;}
 
-/* フッター */
 .footer{
-  position:fixed;
-  bottom:0;
-  left:0;
-  width:100%;
-  display:flex;
-  justify-content:space-around;
-  align-items:center;
-  background:rgba(255,255,255,0.95);
-  backdrop-filter:blur(20px);
-  border-top:1px solid #ddd;
-  z-index:1000;
-  padding-bottom:env(safe-area-inset-bottom);
-  height:calc(60px + env(safe-area-inset-bottom));
+  position:fixed;bottom:0;left:0;width:100%;display:flex;justify-content:space-around;align-items:center;
+  background:rgba(255,255,255,0.95);backdrop-filter:blur(20px);border-top:1px solid #ddd;z-index:1000;
+  padding-bottom:env(safe-area-inset-bottom);height:calc(60px + env(safe-area-inset-bottom));
 }
-.icon-btn{
-  flex:1;
-  height:100%;
-  display:flex;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  border:none;
-  background:none;
-  padding:0;
-  font-size:10px;
-  color:#333;
-  cursor:pointer;
-}
-.icon-btn svg{
-  width:22px;
-  height:22px;
-  stroke:#333;
-  fill:none;
-  stroke-width:2;
-}
+.icon-btn{flex:1;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;border:none;background:none;padding:0;font-size:10px;color:#333;cursor:pointer;}
+.icon-btn svg{width:22px;height:22px;stroke:#333;fill:none;stroke-width:2;}
 .icon-btn span{margin-top:2px;}
 .icon-btn.active svg{stroke:var(--accent);}
 .route-btn svg{stroke:var(--blue);}
 .opt-btn svg{stroke:var(--accent);}
 .clear-btn svg{stroke:var(--danger);}
 
-/* メニューボタン */
 .menu-toggle{
-  position:fixed;
-  top:max(16px, env(safe-area-inset-top));
-  left:16px;
-  z-index:1300;
-  width:46px;
-  height:46px;
-  border:none;
-  border-radius:16px;
-  background:rgba(255,255,255,.94);
-  backdrop-filter:blur(12px);
-  box-shadow:0 12px 28px rgba(15,23,42,.18);
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  cursor:pointer;
+  position:fixed;top:max(16px, env(safe-area-inset-top));left:16px;z-index:1300;width:46px;height:46px;border:none;border-radius:16px;
+  background:rgba(255,255,255,.94);backdrop-filter:blur(12px);box-shadow:0 12px 28px rgba(15,23,42,.18);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
 }
-.menu-toggle svg{
-  width:22px;height:22px;stroke:#111827;fill:none;stroke-width:2;
-}
-
-/* サイドメニュー */
+.menu-toggle svg{width:22px;height:22px;stroke:#111827;fill:none;stroke-width:2;}
 .side-menu{
-  position:fixed;
-  inset:0 auto 0 0;
-  width:min(380px, 88vw);
-  height:100dvh;
-  background:#fff;
-  z-index:1500;
-  transform:translateX(-100%);
-  transition:transform .35s ease;
-  box-shadow:10px 0 28px rgba(0,0,0,.18);
-  display:flex;
-  flex-direction:column;
+  position:fixed;inset:0 auto 0 0;width:min(390px, 90vw);height:100dvh;background:#fff;z-index:1500;
+  transform:translateX(-100%);transition:transform .35s ease;box-shadow:10px 0 28px rgba(0,0,0,.18);display:flex;flex-direction:column;
 }
 .side-menu.open{transform:translateX(0);}
-.menu-overlay{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.28);
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .25s ease;
-  z-index:1400;
-}
-.menu-overlay.show{
-  opacity:1;
-  pointer-events:auto;
-}
-.menu-header{
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  gap:12px;
-  padding:18px 16px 14px;
-  border-bottom:1px solid #eef2f7;
-}
+.menu-overlay{position:fixed;inset:0;background:rgba(0,0,0,.28);opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:1400;}
+.menu-overlay.show{opacity:1;pointer-events:auto;}
+.menu-header{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:18px 16px 14px;border-bottom:1px solid #eef2f7;}
 .menu-header h3{margin:0;font-size:20px;}
-.menu-close{
-  border:none;
-  background:#f3f4f6;
-  width:36px;height:36px;border-radius:12px;
-  cursor:pointer;
+.menu-close{border:none;background:#f3f4f6;width:36px;height:36px;border-radius:12px;cursor:pointer;}
+.menu-scroll{overflow-y:auto;padding:14px 14px 28px;}
+.menu-block{margin-bottom:14px;background:#f8fafc;border:1px solid #eef2f7;border-radius:16px;padding:12px;}
+.menu-block h4{margin:0 0 10px;font-size:14px;}
+.menu-grid{display:grid;gap:10px;}
+.menu-grid input,.menu-grid select{width:100%;padding:11px 12px;border-radius:12px;border:1px solid #dbe2ea;background:#fff;}
+.filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.stat-chip{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;font-size:12px;text-align:center;}
+.stat-chip strong{display:block;font-size:16px;color:#111827;}
+.menu-note{margin-top:8px;color:var(--sub);font-size:12px;line-height:1.5;}
+.onsen-list{display:flex;flex-direction:column;gap:10px;}
+.onsen-item{background:#fff;border:1px solid #e5e7eb;border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;}
+.onsen-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.onsen-name{font-weight:700;font-size:15px;}
+.onsen-type{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--sub);margin-top:4px;}
+.onsen-type-dot{width:10px;height:10px;border-radius:50%;display:inline-block;}
+.onsen-tags{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;}
+.tag-mini{height:26px;padding:0 10px;border-radius:999px;border:1px solid #e5e7eb;background:#f8fafc;font-size:11px;display:inline-flex;align-items:center;}
+.tag-mini.favorite{border-color:#f59e0b;background:#fff7ed;color:#b45309;}
+.tag-mini.visited{border-color:#34c759;background:#f0fdf4;color:#166534;}
+.onsen-mini{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px;font-size:12px;color:#374151;}
+.onsen-mini div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.onsen-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.ghost-btn,.solid-btn,.subtle-btn{
+  flex:1;min-width:0;height:38px;border-radius:12px;border:none;cursor:pointer;font-weight:700;
 }
-.menu-scroll{
-  overflow-y:auto;
-  padding:14px 14px 28px;
-}
-.menu-block{
-  margin-bottom:14px;
-  background:#f8fafc;
-  border:1px solid #eef2f7;
-  border-radius:16px;
-  padding:12px;
-}
-.menu-block h4{
-  margin:0 0 10px;
-  font-size:14px;
-}
-.menu-grid{
-  display:grid;
-  gap:10px;
-}
-.menu-grid input,
-.menu-grid select{
-  width:100%;
-  padding:11px 12px;
-  border-radius:12px;
-  border:1px solid #dbe2ea;
-  background:#fff;
-}
-.menu-note{
-  margin-top:8px;
-  color:var(--sub);
-  font-size:12px;
-  line-height:1.5;
-}
-.onsen-list{
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.onsen-item{
-  background:#fff;
-  border:1px solid #e5e7eb;
-  border-radius:14px;
-  padding:12px;
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
-.onsen-head{
-  display:flex;
-  justify-content:space-between;
-  align-items:flex-start;
-  gap:8px;
-}
-.onsen-name{
-  font-weight:700;
-  font-size:15px;
-}
-.onsen-type{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  font-size:12px;
-  color:var(--sub);
-  margin-top:4px;
-}
-.onsen-type-dot{
-  width:10px;height:10px;border-radius:50%;display:inline-block;
-}
-.onsen-mini{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:6px 10px;
-  font-size:12px;
-  color:#374151;
-}
-.onsen-mini div{
-  white-space:nowrap;
-  overflow:hidden;
-  text-overflow:ellipsis;
-}
-.onsen-actions{
-  display:flex;
-  gap:8px;
-}
-.ghost-btn,.solid-btn{
-  flex:1;
-  height:38px;
-  border-radius:12px;
-  border:none;
-  cursor:pointer;
-  font-weight:700;
-}
-.ghost-btn{
-  background:#eef2ff;
-  color:#1d4ed8;
-}
-.solid-btn{
-  background:var(--accent);
-  color:#fff;
-}
-.solid-btn.is-selected{
-  background:#111827;
-}
-.no-result{
-  color:var(--sub);
-  text-align:center;
-  padding:18px 8px;
-  font-size:14px;
-}
+.ghost-btn{background:#eef2ff;color:#1d4ed8;}
+.solid-btn{background:var(--accent);color:#fff;}
+.solid-btn.is-selected{background:#111827;}
+.subtle-btn{background:#f3f4f6;color:#111827;}
+.no-result{color:var(--sub);text-align:center;padding:18px 8px;font-size:14px;}
 
+.popup-card{min-width:180px;display:flex;flex-direction:column;gap:10px;}
+.popup-title{font-size:14px;font-weight:800;}
+.popup-meta{font-size:12px;color:#6b7280;}
+.popup-actions{display:flex;gap:8px;}
+.popup-actions button{flex:1;height:34px;border:none;border-radius:10px;font-weight:700;cursor:pointer;}
+.popup-pick{background:var(--accent);color:#fff;}
+.popup-detail{background:#eef2ff;color:#1d4ed8;}
 
-
-/* 詳細シート */
 .detail-sheet{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  z-index:1600;
-  background:rgba(255,255,255,.98);
-  backdrop-filter:blur(18px);
-  border-top-left-radius:24px;
-  border-top-right-radius:24px;
-  box-shadow:0 -16px 40px rgba(15,23,42,.18);
-  transform:translateY(calc(100% + 24px));
-  transition:transform .35s ease;
-  max-height:min(72dvh, 640px);
-  display:flex;
-  flex-direction:column;
+  position:fixed;left:0;right:0;bottom:0;z-index:1600;background:rgba(255,255,255,.98);backdrop-filter:blur(18px);
+  border-top-left-radius:24px;border-top-right-radius:24px;box-shadow:0 -16px 40px rgba(15,23,42,.18);
+  transform:translateY(var(--sheet-translate));transition:transform .35s ease;max-height:min(78dvh, 680px);display:flex;flex-direction:column;touch-action:none;
 }
 .detail-sheet.open{transform:translateY(0);}
-.detail-overlay{
-  position:fixed;
-  inset:0;
-  background:rgba(0,0,0,.2);
-  opacity:0;
-  pointer-events:none;
-  transition:opacity .25s ease;
-  z-index:1550;
-}
-.detail-overlay.show{
-  opacity:1;
-  pointer-events:auto;
-}
-.detail-head{
-  position:sticky;
-  top:0;
-  background:linear-gradient(rgba(255,255,255,.98), rgba(255,255,255,.95));
-  padding:10px 16px 8px;
-  border-bottom:1px solid #eef2f7;
-}
-.detail-handle{
-  width:44px;
-  height:5px;
-  background:#d1d5db;
-  border-radius:999px;
-  margin:0 auto 10px;
-}
-.detail-title-row{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
-}
-.detail-title{
-  font-size:20px;
-  font-weight:800;
-  margin:0;
-}
-.detail-close{
-  width:38px;
-  height:38px;
-  border:none;
-  border-radius:12px;
-  background:#f3f4f6;
-  cursor:pointer;
-  font-size:20px;
-}
-.detail-body{
-  overflow-y:auto;
-  padding:16px 16px calc(22px + env(safe-area-inset-bottom));
-}
-.detail-badges{
-  display:flex;
-  flex-wrap:wrap;
-  gap:8px;
-  margin:10px 0 14px;
-}
-.detail-badge{
-  display:inline-flex;
-  align-items:center;
-  gap:6px;
-  height:32px;
-  padding:0 12px;
-  border-radius:999px;
-  background:#f8fafc;
-  border:1px solid #e5e7eb;
-  font-size:13px;
-}
-.detail-section{
-  background:#f8fafc;
-  border:1px solid #eef2f7;
-  border-radius:16px;
-  padding:14px;
-  margin-bottom:12px;
-}
-.detail-section h4{
-  margin:0 0 10px;
-  font-size:14px;
-}
-.detail-grid{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:10px;
-}
-.detail-field{
-  min-width:0;
-}
-.detail-label{
-  display:block;
-  font-size:12px;
-  color:var(--sub);
-  margin-bottom:5px;
-}
-.detail-value{
-  font-size:14px;
-  color:#111827;
-  line-height:1.55;
-  word-break:break-word;
-}
-.detail-actions{
-  display:flex;
-  gap:10px;
-  margin-top:16px;
-}
-.detail-link{
-  display:inline-flex;
-  align-items:center;
-  justify-content:center;
-  width:100%;
-  height:42px;
-  border-radius:12px;
-  background:#111827;
-  color:#fff;
-  text-decoration:none;
-  font-weight:700;
-}
-@media (max-width:520px){
-  .detail-grid{grid-template-columns:1fr;}
-}
+.detail-overlay{position:fixed;inset:0;background:rgba(0,0,0,.2);opacity:0;pointer-events:none;transition:opacity .25s ease;z-index:1550;}
+.detail-overlay.show{opacity:1;pointer-events:auto;}
+.detail-head{position:sticky;top:0;background:linear-gradient(rgba(255,255,255,.98), rgba(255,255,255,.95));padding:10px 16px 8px;border-bottom:1px solid #eef2f7;cursor:grab;touch-action:none;}
+.detail-head.dragging{cursor:grabbing;}
+.detail-handle{width:44px;height:5px;background:#d1d5db;border-radius:999px;margin:0 auto 10px;}
+.detail-title-row{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.detail-title{font-size:20px;font-weight:800;margin:0;}
+.detail-close{width:38px;height:38px;border:none;border-radius:12px;background:#f3f4f6;cursor:pointer;font-size:20px;}
+.detail-body{overflow-y:auto;padding:16px 16px calc(22px + env(safe-area-inset-bottom));}
+.detail-badges{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 14px;}
+.detail-badge{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:999px;background:#f8fafc;border:1px solid #e5e7eb;font-size:13px;}
+.detail-section{background:#f8fafc;border:1px solid #eef2f7;border-radius:16px;padding:14px;margin-bottom:12px;}
+.detail-section h4{margin:0 0 10px;font-size:14px;}
+.detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.detail-field{min-width:0;}
+.detail-label{display:block;font-size:12px;color:var(--sub);margin-bottom:5px;}
+.detail-value{font-size:14px;color:#111827;line-height:1.55;word-break:break-word;}
+.detail-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:16px;}
+.detail-link{display:inline-flex;align-items:center;justify-content:center;width:100%;height:42px;border-radius:12px;background:#111827;color:#fff;text-decoration:none;font-weight:700;}
 
-/* 極小画面 */
+@media (max-width:520px){
+  .detail-grid,.filter-grid{grid-template-columns:1fr;}
+}
 @media (max-width:400px){
   .icon-btn span{display:none;}
 }
-
-/* モバイル */
 .mobile #map{height:100dvh;}
 .mobile .main{display:none;}
 </style>
 </head>
-
 <body>
 <div id="loading"><div class="spinner"></div></div>
-
 <div id="auth">
   <div class="auth-card">
     <h3>Sommelier Map</h3>
     <p>Enterキーでもログインできます</p>
     <form onsubmit="event.preventDefault(); login();">
-      <input type="password" id="pw" placeholder="パスワード" autocomplete="current-password">
+      <input type="password" id="pw" placeholder="パスワード" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
       <button type="submit">ログイン</button>
     </form>
-    <div class="auth-hint">背景画像は login-bg.jpg を同じ階層に配置してください</div>
+    <div class="auth-hint">背景画像は login-bg.JPG を同じ階層に配置してください</div>
   </div>
 </div>
 
 <div id="app">
   <button id="menuToggle" class="menu-toggle" onclick="toggleMenu()" aria-label="メニューを開く">
-    <svg viewBox="0 0 24 24">
-      <path d="M4 7h16M4 12h16M4 17h16"/>
-    </svg>
+    <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
   </button>
-
   <div id="menuOverlay" class="menu-overlay" onclick="closeMenu()"></div>
-
   <aside id="sideMenu" class="side-menu" aria-hidden="true">
     <div class="menu-header">
       <h3>温泉メニュー</h3>
       <button class="menu-close" onclick="closeMenu()" aria-label="閉じる">×</button>
     </div>
-
     <div class="menu-scroll">
+      <section class="menu-block">
+        <h4>サマリー</h4>
+        <div class="stat-row">
+          <div class="stat-chip"><strong id="statTotal">0</strong>総数</div>
+          <div class="stat-chip"><strong id="statFav">0</strong>お気に入り</div>
+          <div class="stat-chip"><strong id="statVisited">0</strong>訪問済み</div>
+        </div>
+      </section>
+
       <section class="menu-block">
         <h4>検索・並び替え</h4>
         <div class="menu-grid">
-          <input id="searchBox" type="text" placeholder="温泉名・泉質・レビューで検索" oninput="renderOnsenList()">
+          <input id="searchBox" type="text" placeholder="温泉名・泉質・濃さ・都道府県・レビューで検索" oninput="renderOnsenList()">
           <select id="sortSelect" onchange="renderOnsenList()">
             <option value="default">並び替えなし</option>
             <option value="name">名前順</option>
             <option value="type">泉質順</option>
             <option value="priceAsc">価格が安い順</option>
             <option value="ratingDesc">評価が高い順</option>
+            <option value="distanceAsc">現在地から近い順</option>
           </select>
         </div>
-        <div class="menu-note">価格や評価が未入力の行は自動で末尾寄りに並びます。</div>
+      </section>
+
+      <section class="menu-block">
+        <h4>絞り込み</h4>
+        <div class="filter-grid">
+          <select id="prefectureFilter" onchange="renderOnsenList()">
+            <option value="">都道府県をすべて表示</option>
+          </select>
+          <select id="typeFilter" onchange="renderOnsenList()">
+            <option value="">泉質をすべて表示</option>
+          </select>
+          <select id="densityFilter" onchange="renderOnsenList()">
+            <option value="">濃さをすべて表示</option>
+          </select>
+          <select id="priceFilter" onchange="renderOnsenList()">
+            <option value="">価格帯をすべて表示</option>
+            <option value="cheap">1000円以下</option>
+            <option value="mid">1001〜1500円</option>
+            <option value="high">1501円以上</option>
+            <option value="unknown">価格未設定</option>
+          </select>
+          <select id="favoriteFilter" onchange="renderOnsenList()">
+            <option value="">お気に入り条件なし</option>
+            <option value="only">お気に入りのみ</option>
+            <option value="exclude">お気に入り以外</option>
+          </select>
+          <select id="visitedFilter" onchange="renderOnsenList()">
+            <option value="">訪問条件なし</option>
+            <option value="only">訪問済みのみ</option>
+            <option value="exclude">未訪問のみ</option>
+          </select>
+        </div>
+        <div class="filter-actions">
+          <button class="ghost-btn filter-reset-btn" onclick="resetFilters()">絞り込み解除</button>
+          <div id="filterSummary" class="filter-summary"></div>
+        </div>
+        <div class="menu-note">お気に入り・訪問済み・選択ルートは端末内に保存されます。</div>
       </section>
 
       <section class="menu-block">
@@ -605,11 +310,9 @@ button,input,select{font:inherit;}
     </div>
   </div>
 
-
-
   <div id="detailOverlay" class="detail-overlay" onclick="closeDetail()"></div>
   <section id="detailSheet" class="detail-sheet" aria-hidden="true">
-    <div class="detail-head">
+    <div id="detailHead" class="detail-head">
       <div class="detail-handle"></div>
       <div class="detail-title-row">
         <h3 id="detailTitle" class="detail-title">温泉詳細</h3>
@@ -619,63 +322,57 @@ button,input,select{font:inherit;}
     <div id="detailBody" class="detail-body"></div>
   </section>
 
-
   <div class="footer">
     <button onclick="drawRoute()" class="icon-btn route-btn" aria-label="ルート表示">
-      <svg viewBox="0 0 24 24"><path d="M3 12h18M12 3l9 9-9 9"/></svg>
-      <span>ルート</span>
+      <svg viewBox="0 0 24 24"><path d="M3 12h18M12 3l9 9-9 9"/></svg><span>ルート</span>
     </button>
-
     <button onclick="optimizeRoute()" class="icon-btn opt-btn" aria-label="最適化">
-      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg>
-      <span>最適化</span>
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h10M4 18h7"/></svg><span>最適化</span>
     </button>
-
     <button onclick="clearRoute()" class="icon-btn clear-btn" aria-label="リセット">
-      <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6v12M16 6v12"/></svg>
-      <span>リセット</span>
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6v12M16 6v12"/></svg><span>リセット</span>
     </button>
-
     <button onclick="generateRoute()" class="icon-btn route-btn" aria-label="Google Mapでルート作成">
-      <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 12h8"/></svg>
-      <span>Google</span>
+      <svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 12h8"/></svg><span>Google</span>
     </button>
-
     <button id="toggleStart" class="icon-btn toggle-btn" onclick="toggleStartMode()" aria-label="現在地から検索を切り替え">
-      <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg>
-      <span>現在地</span>
+      <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/></svg><span>現在地</span>
     </button>
   </div>
 </div>
 
 <script>
-const isMobile = window.matchMedia("(pointer: coarse)").matches;
-if(isMobile) document.body.classList.add("mobile");
+const isMobile = window.matchMedia('(pointer: coarse)').matches;
+if(isMobile) document.body.classList.add('mobile');
 
-const PW_HASH = "b25zZW4=";
-const MAPTILER_KEY = "5803br5MI3qRfp9DVSHL";
+const PW_HASH = 'b25zZW4=';
+const MAPTILER_KEY = '5803br5MI3qRfp9DVSHL';
+const STORAGE_KEY = 'onsen-master-stage5';
 
 let map;
 let onsens = [];
 let selected = [];
 let startFromCurrent = false;
+let currentPopup = null;
+let currentLocation = null;
+let detailDrag = null;
 
 const typeColor = {
-  "銭湯": "#7f8c8d",
-  "単純温泉": "#87ceeb",
-  "塩化物泉": "#e74c3c",
-  "炭酸水素塩泉": "#1abc9c",
-  "硫酸塩泉": "#9b59b6",
-  "二酸化炭素泉": "#3498db",
-  "含鉄泉": "#d35400",
-  "硫黄泉": "#f1c40f",
-  "酸性泉": "#e84393",
-  "放射能泉": "#27ae60",
-  "含よう素泉": "#e67e22"
+  '銭湯': '#7f8c8d',
+  '単純温泉': '#87ceeb',
+  '塩化物泉': '#e74c3c',
+  '炭酸水素塩泉': '#1abc9c',
+  '硫酸塩泉': '#9b59b6',
+  '二酸化炭素泉': '#3498db',
+  '含鉄泉': '#d35400',
+  '硫黄泉': '#f1c40f',
+  '酸性泉': '#e84393',
+  '放射能泉': '#27ae60',
+  '含よう素泉': '#e67e22'
 };
 
 function showLoading(v){
-  document.getElementById("loading").classList.toggle("active", v);
+  document.getElementById('loading').classList.toggle('active', v);
 }
 
 function fitRoute(coords){
@@ -683,98 +380,105 @@ function fitRoute(coords){
   const bounds = new maplibregl.LngLatBounds(coords[0], coords[0]);
   coords.forEach(c => bounds.extend(c));
   map.fitBounds(bounds, {
-    padding: {
-      top: 60,
-      bottom: isMobile ? 120 : 220,
-      left: 40,
-      right: 40
-    },
+    padding: { top: 60, bottom: isMobile ? 120 : 220, left: 40, right: 40 },
     duration: 600
   });
 }
 
+function resetViewportScale(){
+  const meta = document.querySelector('meta[name="viewport"]');
+  if(!meta) return;
+  meta.setAttribute('content', 'width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1');
+  requestAnimationFrame(() => {
+    window.scrollTo(0, 0);
+    document.body.style.zoom = '1';
+  });
+}
+
 function login(){
-  const pw = document.getElementById("pw");
+  const pw = document.getElementById('pw');
   if(atob(PW_HASH) !== pw.value){
-    alert("パスワードが違います");
+    alert('パスワードが違います');
     return;
   }
+  pw.blur();
+  resetViewportScale();
 
-  const auth = document.getElementById("auth");
-  const app = document.getElementById("app");
-
+  const auth = document.getElementById('auth');
+  const app = document.getElementById('app');
   auth.style.opacity = 0;
-  auth.style.transform = "scale(1.05)";
+  auth.style.transform = 'scale(1.05)';
 
   setTimeout(() => {
-    auth.style.display = "none";
+    auth.style.display = 'none';
     app.style.opacity = 1;
-    app.style.transform = "translateY(0) scale(1)";
+    app.style.transform = 'translateY(0) scale(1)';
+    resetViewportScale();
     init();
-  }, 500);
+  }, 450);
 }
 
 async function init(){
   await loadCSV();
+  setupFilterOptions();
+  hydrateState();
+  updateStats();
 
   map = new maplibregl.Map({
-    container: "map",
+    container: 'map',
     style: `https://api.maptiler.com/maps/streets/style.json?key=${MAPTILER_KEY}`,
     center: [137, 36],
     zoom: 5
   });
 
-  map.on("load", () => {
+  map.on('load', () => {
     map.resize();
     setupMap();
     renderSelected();
     renderOnsenList();
 
-    map.addSource("route", {
-      type: "geojson",
-      data: { type: "FeatureCollection", features: [] }
-    });
-
+    map.addSource('route', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({
-      id: "route",
-      type: "line",
-      source: "route",
-      paint: {
-        "line-color": "#007aff",
-        "line-width": 4
-      }
+      id: 'route',
+      type: 'line',
+      source: 'route',
+      paint: { 'line-color': '#007aff', 'line-width': 4 }
     });
   });
+
+  setupDetailDrag();
 }
 
 async function loadCSV(){
-  const txt = await (await fetch("onsen.csv")).text();
+  const txt = await (await fetch('onsen_stage5_plus.csv')).text();
   onsens = parseCSV(txt).map((row, i) => ({
     id: i,
-    name: (row.name || "").trim(),
+    name: (row.name || '').trim(),
     lat: Number(row.lat),
     lng: Number(row.lng),
-    type: (row.type || "").trim(),
-    price: (row.price || "").trim(),
-    rating: (row.rating || "").trim(),
-    review: (row.review || "").trim(),
-    description: (row.description || "").trim(),
-    address: (row.address || "").trim(),
-    hours: (row.hours || "").trim(),
-    url: (row.url || "").trim()
+    type: (row.type || '').trim(),
+    density: (row.density || '').trim(),
+    prefecture: (row.prefecture || '').trim(),
+    price: (row.price || '').trim(),
+    rating: (row.rating || '').trim(),
+    review: (row.review || '').trim(),
+    description: (row.description || '').trim(),
+    address: (row.address || '').trim(),
+    hours: (row.hours || '').trim(),
+    url: (row.url || '').trim(),
+    favorite: toBool(row.favorite),
+    visited: toBool(row.visited)
   })).filter(o => Number.isFinite(o.lat) && Number.isFinite(o.lng) && o.name);
 }
 
 function parseCSV(text){
   const rows = [];
   let row = [];
-  let value = "";
+  let value = '';
   let inQuotes = false;
-
   for(let i = 0; i < text.length; i++){
     const ch = text[i];
     const next = text[i + 1];
-
     if(ch === '"'){
       if(inQuotes && next === '"'){
         value += '"';
@@ -783,182 +487,172 @@ function parseCSV(text){
         inQuotes = !inQuotes;
       }
     }else if(ch === ',' && !inQuotes){
-      row.push(value);
-      value = "";
+      row.push(value); value = '';
     }else if((ch === '\n' || ch === '\r') && !inQuotes){
       if(ch === '\r' && next === '\n') i++;
-      row.push(value);
-      value = "";
-      if(row.some(cell => cell !== "")) rows.push(row);
+      row.push(value); value = '';
+      if(row.some(cell => cell !== '')) rows.push(row);
       row = [];
     }else{
       value += ch;
     }
   }
-
-  if(value !== "" || row.length){
+  if(value !== '' || row.length){
     row.push(value);
-    if(row.some(cell => cell !== "")) rows.push(row);
+    if(row.some(cell => cell !== '')) rows.push(row);
   }
-
   if(!rows.length) return [];
   const headers = rows[0].map(h => h.trim());
   return rows.slice(1).map(cols => {
     const obj = {};
-    headers.forEach((header, idx) => {
-      obj[header] = (cols[idx] || "").trim();
-    });
+    headers.forEach((header, idx) => obj[header] = (cols[idx] || '').trim());
     return obj;
   });
 }
 
+function setupFilterOptions(){
+  const typeSelect = document.getElementById('typeFilter');
+  const prefectureSelect = document.getElementById('prefectureFilter');
+  const densitySelect = document.getElementById('densityFilter');
+
+  const types = [...new Set(onsens.map(o => o.type).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'ja'));
+  const prefectures = [...new Set(onsens.map(o => o.prefecture).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'ja'));
+  const densityOrder = ['濃い', 'やや濃い', '普通', 'ややあっさり', 'あっさり'];
+  const densitySet = [...new Set(onsens.map(o => o.density).filter(Boolean))];
+  const densities = densitySet.sort((a,b) => {
+    const ai = densityOrder.indexOf(a);
+    const bi = densityOrder.indexOf(b);
+    if(ai === -1 && bi === -1) return a.localeCompare(b, 'ja');
+    if(ai === -1) return 1;
+    if(bi === -1) return -1;
+    return ai - bi;
+  });
+
+  if(prefectureSelect){
+    prefectureSelect.innerHTML = '<option value="">都道府県をすべて表示</option>' + prefectures.map(v => `<option value="${escapeAttr(v)}">${escapeHTML(v)}</option>`).join('');
+  }
+  if(typeSelect){
+    typeSelect.innerHTML = '<option value="">泉質をすべて表示</option>' + types.map(v => `<option value="${escapeAttr(v)}">${escapeHTML(v)}</option>`).join('');
+  }
+  if(densitySelect){
+    densitySelect.innerHTML = '<option value="">濃さをすべて表示</option>' + densities.map(v => `<option value="${escapeAttr(v)}">${escapeHTML(v)}</option>`).join('');
+  }
+}
+
 function setupMap(){
-  map.addSource("onsen", {
-    type: "geojson",
+  map.addSource('onsen', {
+    type: 'geojson',
     data: geo(),
     cluster: true,
     clusterMaxZoom: 10,
     clusterRadius: 40
   });
 
+  map.addLayer({ id:'cluster', type:'circle', source:'onsen', filter:['has','point_count'], paint:{'circle-color':'#636e72','circle-radius':18} });
+  map.addLayer({ id:'cluster-count', type:'symbol', source:'onsen', filter:['has','point_count'], layout:{'text-field':['get','point_count']}, paint:{'text-color':'#fff'} });
+  map.addLayer({ id:'points', type:'circle', source:'onsen', filter:['!has','point_count'], paint:{'circle-color':['get','color'],'circle-radius':8} });
+  map.addLayer({ id:'selected', type:'circle', source:'onsen', filter:['in','id',-1], paint:{'circle-color':['get','color'],'circle-radius':14,'circle-stroke-width':3,'circle-stroke-color':'#f1c40f'} });
+  map.addLayer({ id:'order', type:'symbol', source:'onsen', filter:['in','id',-1], layout:{'text-field':['get','order'],'text-size':14}, paint:{'text-color':'#fff'} });
   map.addLayer({
-    id: "cluster",
-    type: "circle",
-    source: "onsen",
-    filter: ["has", "point_count"],
-    paint: {"circle-color": "#636e72", "circle-radius": 18}
+    id:'label', type:'symbol', source:'onsen', filter:['!has','point_count'],
+    layout:{'text-field':['get','name'],'text-size':14,'text-offset':[0,1.2]},
+    paint:{'text-color':'#000','text-halo-color':'#fff','text-halo-width':2}
   });
 
-  map.addLayer({
-    id: "cluster-count",
-    type: "symbol",
-    source: "onsen",
-    filter: ["has", "point_count"],
-    layout: {"text-field": ["get", "point_count"]},
-    paint: {"text-color": "#fff"}
-  });
+  map.moveLayer('selected');
+  map.moveLayer('order');
 
-  map.addLayer({
-    id: "points",
-    type: "circle",
-    source: "onsen",
-    filter: ["!has", "point_count"],
-    paint: {
-      "circle-color": ["get", "color"],
-      "circle-radius": 8
-    }
-  });
-
-  map.addLayer({
-    id: "selected",
-    type: "circle",
-    source: "onsen",
-    filter: ["in", "id", -1],
-    paint: {
-      "circle-color": ["get", "color"],
-      "circle-radius": 14,
-      "circle-stroke-width": 3,
-      "circle-stroke-color": "#f1c40f"
-    }
-  });
-
-  map.addLayer({
-    id: "order",
-    type: "symbol",
-    source: "onsen",
-    filter: ["in", "id", -1],
-    layout: {"text-field": ["get", "order"], "text-size": 14},
-    paint: {"text-color": "#fff"}
-  });
-
-  map.addLayer({
-    id: "label",
-    type: "symbol",
-    source: "onsen",
-    filter: ["!has", "point_count"],
-    layout: {
-      "text-field": ["get", "name"],
-      "text-size": 14,
-      "text-offset": [0, 1.2]
-    },
-    paint: {
-      "text-color": "#000",
-      "text-halo-color": "#fff",
-      "text-halo-width": 2
-    }
-  });
-
-  map.moveLayer("selected");
-  map.moveLayer("order");
-
-  map.on("click", (e) => {
-    const features = map.queryRenderedFeatures(
-      [
-        [e.point.x - 10, e.point.y - 10],
-        [e.point.x + 10, e.point.y + 10]
-      ],
-      { layers: ["points"] }
-    );
-
+  map.on('click', e => {
+    const features = map.queryRenderedFeatures([[e.point.x - 10, e.point.y - 10],[e.point.x + 10, e.point.y + 10]], { layers:['points'] });
     if(features.length){
       const id = Number(features[0].properties.id);
-      toggle(id, {showDetail:true, focus:false});
+      openPointActionPopup(id, features[0].geometry.coordinates);
+    }else{
+      closePointPopup();
     }
   });
 
-  map.on("click", "cluster", e => {
-    const f = map.queryRenderedFeatures(e.point, { layers:["cluster"] })[0];
-    map.getSource("onsen").getClusterExpansionZoom(f.properties.cluster_id, (err, zoom) => {
+  map.on('click', 'cluster', e => {
+    const f = map.queryRenderedFeatures(e.point, { layers:['cluster'] })[0];
+    map.getSource('onsen').getClusterExpansionZoom(f.properties.cluster_id, (err, zoom) => {
       if(err) return;
-      map.easeTo({ center: f.geometry.coordinates, zoom });
+      map.easeTo({ center:f.geometry.coordinates, zoom });
     });
   });
+
+  map.on('movestart', closePointPopup);
 }
 
 function geo(){
   return {
-    type: "FeatureCollection",
+    type: 'FeatureCollection',
     features: onsens.map(o => ({
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [o.lng, o.lat] },
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [o.lng, o.lat] },
       properties: {
         id: o.id,
         name: o.name,
-        color: typeColor[o.type] || "#7f8c8d",
-        order: selected.includes(o.id) ? String(selected.indexOf(o.id) + 1) : ""
+        color: typeColor[o.type] || '#7f8c8d',
+        order: selected.includes(o.id) ? String(selected.indexOf(o.id) + 1) : ''
       }
     }))
   };
 }
 
 function update(){
-  if(!map || !map.getSource("onsen")) return;
-  map.getSource("onsen").setData(geo());
-  map.setFilter("selected", ["in", "id", ...selected]);
-  map.setFilter("order", ["in", "id", ...selected]);
+  if(map?.getSource('onsen')){
+    map.getSource('onsen').setData(geo());
+    map.setFilter('selected', ['in','id',...selected]);
+    map.setFilter('order', ['in','id',...selected]);
+  }
+  persistState();
+  updateStats();
   renderSelected();
   renderOnsenList();
+}
+
+function persistState(){
+  try{
+    const meta = {};
+    onsens.forEach(o => { meta[o.id] = { favorite: !!o.favorite, visited: !!o.visited }; });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ selected, startFromCurrent, meta }));
+  }catch(err){}
+}
+
+function hydrateState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw) return;
+    const saved = JSON.parse(raw);
+    if(Array.isArray(saved.selected)) selected = saved.selected.filter(id => onsens.some(o => o.id === id));
+    startFromCurrent = !!saved.startFromCurrent;
+    if(saved.meta && typeof saved.meta === 'object'){
+      onsens.forEach(o => {
+        if(saved.meta[o.id]){
+          o.favorite = !!saved.meta[o.id].favorite;
+          o.visited = !!saved.meta[o.id].visited;
+        }
+      });
+    }
+    document.getElementById('toggleStart').classList.toggle('active', startFromCurrent);
+  }catch(err){}
+}
+
+function updateStats(){
+  document.getElementById('statTotal').textContent = String(onsens.length);
+  document.getElementById('statFav').textContent = String(onsens.filter(o => o.favorite).length);
+  document.getElementById('statVisited').textContent = String(onsens.filter(o => o.visited).length);
 }
 
 async function drawRoute(){
   if(selected.length < 2) return;
   showLoading(true);
-
-  const coordPairs = selected.map(i => {
-    const o = onsens[i];
-    return [o.lng, o.lat];
-  });
-
+  const coordPairs = selected.map(i => [onsens[i].lng, onsens[i].lat]);
   fitRoute(coordPairs);
-
-  const coords = coordPairs.map(c => c.join(","));
-  const data = await (await fetch(`https://router.project-osrm.org/route/v1/driving/${coords.join(";")}?overview=full&geometries=geojson`)).json();
-
-  map.getSource("route").setData({
-    type: "Feature",
-    geometry: data.routes[0].geometry
-  });
-
+  const coords = coordPairs.map(c => c.join(','));
+  const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords.join(';')}?overview=full&geometries=geojson`);
+  const data = await res.json();
+  map.getSource('route').setData({ type:'Feature', geometry:data.routes[0].geometry });
   showLoading(false);
 }
 
@@ -972,62 +666,117 @@ async function optimizeRoute(){
 
 function renderSelected(){
   if(isMobile) return;
-  const el = document.getElementById("selected");
-
+  const el = document.getElementById('selected');
   if(!selected.length){
     el.innerHTML = '<div class="empty-note">地図またはメニュー一覧から温泉を選択してください。</div>';
     return;
   }
-
   el.innerHTML = selected.map(i => {
     const o = onsens[i];
     return `
       <div class="selected-item" onclick="showDetail(${i})" role="button" tabindex="0">
         <div class="selected-item-info">
           <div class="selected-item-title">${escapeHTML(o.name)}</div>
-          <div class="selected-item-meta">${escapeHTML(o.type || "泉質未設定")} / ${escapeHTML(formatPrice(o.price))}</div>
+          <div class="selected-item-meta">${escapeHTML(o.prefecture || '都道府県未設定')} / ${escapeHTML(o.type || '泉質未設定')}</div>
         </div>
         <button class="remove-btn" onclick="event.stopPropagation(); removeItem(${i})" aria-label="${escapeAttr(o.name)} を削除">×</button>
-      </div>
-    `;
-  }).join("");
+      </div>`;
+  }).join('');
+}
+
+function getFilteredOnsens(){
+  const keyword = (document.getElementById('searchBox')?.value || '').trim().toLowerCase();
+  const prefectureFilter = document.getElementById('prefectureFilter')?.value || '';
+  const typeFilter = document.getElementById('typeFilter')?.value || '';
+  const densityFilter = document.getElementById('densityFilter')?.value || '';
+  const priceFilter = document.getElementById('priceFilter')?.value || '';
+  const favoriteFilter = document.getElementById('favoriteFilter')?.value || '';
+  const visitedFilter = document.getElementById('visitedFilter')?.value || '';
+  const sort = document.getElementById('sortSelect')?.value || 'default';
+
+  let list = [...onsens];
+  if(keyword){
+    list = list.filter(o => [o.name, o.type, o.density, o.prefecture, o.review, o.description, o.address].filter(Boolean).some(v => v.toLowerCase().includes(keyword)));
+  }
+  if(prefectureFilter){
+    list = list.filter(o => o.prefecture === prefectureFilter);
+  }
+  if(typeFilter){
+    list = list.filter(o => o.type === typeFilter);
+  }
+  if(densityFilter){
+    list = list.filter(o => o.density === densityFilter);
+  }
+  if(priceFilter){
+    list = list.filter(o => matchPriceFilter(o.price, priceFilter));
+  }
+  if(favoriteFilter === 'only') list = list.filter(o => o.favorite);
+  if(favoriteFilter === 'exclude') list = list.filter(o => !o.favorite);
+  if(visitedFilter === 'only') list = list.filter(o => o.visited);
+  if(visitedFilter === 'exclude') list = list.filter(o => !o.visited);
+
+  if(sort === 'name') list.sort((a,b) => a.name.localeCompare(b.name, 'ja'));
+  else if(sort === 'type') list.sort((a,b) => (a.type || '').localeCompare(b.type || '', 'ja'));
+  else if(sort === 'priceAsc') list.sort((a,b) => normalizePrice(a.price) - normalizePrice(b.price));
+  else if(sort === 'ratingDesc') list.sort((a,b) => normalizeRating(b.rating) - normalizeRating(a.rating));
+  else if(sort === 'distanceAsc') list.sort((a,b) => getDistanceValue(a) - getDistanceValue(b));
+
+  return list;
+}
+
+function updateFilterSummary(resultCount){
+  const el = document.getElementById('filterSummary');
+  if(!el) return;
+  const total = onsens.length;
+  const active = [];
+  const prefecture = document.getElementById('prefectureFilter')?.value;
+  const type = document.getElementById('typeFilter')?.value;
+  const density = document.getElementById('densityFilter')?.value;
+  const price = document.getElementById('priceFilter')?.value;
+  const favorite = document.getElementById('favoriteFilter')?.value;
+  const visited = document.getElementById('visitedFilter')?.value;
+  if(prefecture) active.push(`都道府県:${prefecture}`);
+  if(type) active.push(`泉質:${type}`);
+  if(density) active.push(`濃さ:${density}`);
+  if(price) active.push(`価格:${labelForPriceFilter(price)}`);
+  if(favorite) active.push(favorite === 'only' ? 'お気に入りのみ' : 'お気に入り以外');
+  if(visited) active.push(visited === 'only' ? '訪問済みのみ' : '未訪問のみ');
+  el.textContent = active.length ? `${resultCount}件 / ${total}件　${active.join(' / ')}` : `${resultCount}件 / ${total}件`;
+}
+
+function labelForPriceFilter(value){
+  if(value === 'cheap') return '1000円以下';
+  if(value === 'mid') return '1001〜1500円';
+  if(value === 'high') return '1501円以上';
+  if(value === 'unknown') return '価格未設定';
+  return '';
+}
+
+function resetFilters(){
+  const ids = ['searchBox', 'prefectureFilter', 'typeFilter', 'densityFilter', 'priceFilter', 'favoriteFilter', 'visitedFilter', 'sortSelect'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.value = id === 'sortSelect' ? 'default' : '';
+  });
+  renderOnsenList();
 }
 
 function renderOnsenList(){
-  const el = document.getElementById("onsenList");
+  const el = document.getElementById('onsenList');
   if(!el) return;
-
-  const keyword = (document.getElementById("searchBox")?.value || "").trim().toLowerCase();
-  const sort = document.getElementById("sortSelect")?.value || "default";
-
-  let list = [...onsens];
-
-  if(keyword){
-    list = list.filter(o => {
-      return [o.name, o.type, o.review, o.description, o.address]
-        .filter(Boolean)
-        .some(v => v.toLowerCase().includes(keyword));
-    });
-  }
-
-  if(sort === "name"){
-    list.sort((a,b) => a.name.localeCompare(b.name, "ja"));
-  }else if(sort === "type"){
-    list.sort((a,b) => (a.type || "").localeCompare(b.type || "", "ja"));
-  }else if(sort === "priceAsc"){
-    list.sort((a,b) => normalizePrice(a.price) - normalizePrice(b.price));
-  }else if(sort === "ratingDesc"){
-    list.sort((a,b) => normalizeRating(b.rating) - normalizeRating(a.rating));
-  }
-
+  const list = getFilteredOnsens();
   if(!list.length){
     el.innerHTML = '<div class="no-result">該当する温泉がありません。</div>';
+    updateFilterSummary(0);
     return;
   }
-
+  updateFilterSummary(list.length);
   el.innerHTML = list.map(o => {
     const selectedClass = selected.includes(o.id) ? 'solid-btn is-selected' : 'solid-btn';
     const selectedLabel = selected.includes(o.id) ? '選択解除' : '選択';
+    const fav = o.favorite ? '<span class="tag-mini favorite">★ お気に入り</span>' : '';
+    const visited = o.visited ? '<span class="tag-mini visited">訪問済み</span>' : '';
     return `
       <article class="onsen-item">
         <div class="onsen-head">
@@ -1038,29 +787,62 @@ function renderOnsenList(){
               <span>${escapeHTML(o.type || '泉質未設定')}</span>
             </div>
           </div>
+          <div class="onsen-tags">${fav}${visited}</div>
         </div>
 
         <div class="onsen-mini">
+          <div>都道府県: ${escapeHTML(o.prefecture || '未設定')}</div>
+          <div>濃さ: ${escapeHTML(o.density || '未設定')}</div>
           <div>価格: ${escapeHTML(formatPrice(o.price))}</div>
           <div>評価: ${escapeHTML(formatRating(o.rating))}</div>
           <div title="${escapeAttr(o.review || 'レビュー未設定')}">レビュー: ${escapeHTML(o.review || '未設定')}</div>
-          <div title="${escapeAttr(o.hours || '営業時間未設定')}">営業時間: ${escapeHTML(o.hours || '未設定')}</div>
+          <div title="${escapeAttr(o.hours || '営業時間未設定')}">${currentLocation ? '距離: ' + escapeHTML(formatDistance(getDistanceValue(o))) : '営業時間: ' + escapeHTML(o.hours || '未設定')}</div>
         </div>
 
         <div class="onsen-actions">
-          <button class="ghost-btn" onclick="focusOnsen(${o.id}); showDetail(${o.id});">地図へ</button>
+          <button class="ghost-btn" onclick="focusOnsen(${o.id});">地図へ</button>
           <button class="ghost-btn" onclick="showDetail(${o.id})">詳細</button>
-          <button class="${selectedClass}" onclick="toggle(${o.id}, {showDetail:true})">${selectedLabel}</button>
+          <button class="${selectedClass}" onclick="toggle(${o.id})">${selectedLabel}</button>
         </div>
-      </article>
-    `;
-  }).join("");
+        <div class="onsen-actions">
+          <button class="subtle-btn" onclick="toggleFavorite(${o.id})">${o.favorite ? '★ お気に入り解除' : '☆ お気に入り'}</button>
+          <button class="subtle-btn" onclick="toggleVisited(${o.id})">${o.visited ? '訪問済み解除' : '訪問済みにする'}</button>
+        </div>
+      </article>`;
+  }).join('');
 }
 
-function focusOnsen(id, closeMenuAfter = true){
+function openPointActionPopup(id, coords){
   const o = onsens.find(x => x.id === id);
   if(!o || !map) return;
-  map.easeTo({ center:[o.lng, o.lat], zoom: 11, duration: 700 });
+  closePointPopup();
+  const selectedLabel = selected.includes(id) ? '選択解除' : '選択';
+  const html = `
+    <div class="popup-card">
+      <div>
+        <div class="popup-title">${escapeHTML(o.name)}</div>
+        <div class="popup-meta">${escapeHTML(o.prefecture || '都道府県未設定')} / ${escapeHTML(o.type || '泉質未設定')}</div>
+      </div>
+      <div class="popup-actions">
+        <button class="popup-pick" data-popup-action="toggle" data-id="${id}">${selectedLabel}</button>
+        <button class="popup-detail" data-popup-action="detail" data-id="${id}">詳細</button>
+      </div>
+    </div>`;
+  currentPopup = new maplibregl.Popup({ closeButton:false, offset:18 })
+    .setLngLat(coords)
+    .setHTML(html)
+    .addTo(map);
+}
+
+function closePointPopup(){
+  if(currentPopup){ currentPopup.remove(); currentPopup = null; }
+}
+
+function focusOnsen(id, closeMenuAfter=true){
+  const o = onsens.find(x => x.id === id);
+  if(!o || !map) return;
+  closePointPopup();
+  map.easeTo({ center:[o.lng, o.lat], zoom:11, duration:700 });
   if(closeMenuAfter) closeMenu();
 }
 
@@ -1069,76 +851,89 @@ function removeItem(i){
   update();
 }
 
-function toggle(i, options = {}){
-  const { showDetail: shouldShowDetail = false, focus = false } = options;
-
-  if(selected.includes(i)){
-    selected = selected.filter(x => x !== i);
-  }else{
-    selected.push(i);
-  }
-
+function toggle(i){
+  if(selected.includes(i)) selected = selected.filter(x => x !== i);
+  else selected.push(i);
+  closePointPopup();
   update();
+}
 
-  if(focus) focusOnsen(i, false);
-  if(shouldShowDetail) showDetail(i);
+function toggleFavorite(id){
+  const o = onsens.find(x => x.id === id);
+  if(!o) return;
+  o.favorite = !o.favorite;
+  update();
+}
+
+function toggleVisited(id){
+  const o = onsens.find(x => x.id === id);
+  if(!o) return;
+  o.visited = !o.visited;
+  update();
 }
 
 function clearRoute(){
-  if(map?.getSource("route")){
-    map.getSource("route").setData({ type:"FeatureCollection", features:[] });
-  }
+  if(map?.getSource('route')) map.getSource('route').setData({ type:'FeatureCollection', features:[] });
 }
 
 function toggleStartMode(){
   startFromCurrent = !startFromCurrent;
-  document.getElementById("toggleStart").classList.toggle("active", startFromCurrent);
+  document.getElementById('toggleStart').classList.toggle('active', startFromCurrent);
+  if(startFromCurrent) requestCurrentLocation();
+  persistState();
+  renderOnsenList();
+}
+
+function requestCurrentLocation(){
+  if(!navigator.geolocation) return;
+  navigator.geolocation.getCurrentPosition(pos => {
+    currentLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    renderOnsenList();
+  }, () => {}, { enableHighAccuracy:true, timeout:8000, maximumAge:300000 });
 }
 
 function generateRoute(){
   if(!selected.length) return;
-
   const names = selected.map(i => encodeURIComponent(onsens[i].name));
   const url = startFromCurrent
     ? `https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${names.at(-1)}&waypoints=${names.slice(0,-1).join('|')}`
     : `https://www.google.com/maps/dir/?api=1&origin=${names[0]}&destination=${names.at(-1)}&waypoints=${names.slice(1,-1).join('|')}`;
-
   window.open(url);
 }
 
 function toggleMenu(){
-  const menu = document.getElementById("sideMenu");
-  const overlay = document.getElementById("menuOverlay");
-  const opened = menu.classList.toggle("open");
-  overlay.classList.toggle("show", opened);
-  menu.setAttribute("aria-hidden", String(!opened));
+  const menu = document.getElementById('sideMenu');
+  const overlay = document.getElementById('menuOverlay');
+  const opened = menu.classList.toggle('open');
+  overlay.classList.toggle('show', opened);
+  menu.setAttribute('aria-hidden', String(!opened));
 }
 
 function closeMenu(){
-  document.getElementById("sideMenu").classList.remove("open");
-  document.getElementById("menuOverlay").classList.remove("show");
-  document.getElementById("sideMenu").setAttribute("aria-hidden", "true");
+  document.getElementById('sideMenu').classList.remove('open');
+  document.getElementById('menuOverlay').classList.remove('show');
+  document.getElementById('sideMenu').setAttribute('aria-hidden', 'true');
 }
-
 
 function showDetail(id){
   const o = onsens.find(x => x.id === id);
   if(!o) return;
+  closePointPopup();
 
-  const body = document.getElementById("detailBody");
-  const title = document.getElementById("detailTitle");
+  const body = document.getElementById('detailBody');
+  const title = document.getElementById('detailTitle');
   const selectedNow = selected.includes(id);
-
   title.textContent = o.name;
   body.innerHTML = `
     <div class="detail-badges">
-      <span class="detail-badge">
-        <span class="onsen-type-dot" style="background:${typeColor[o.type] || '#7f8c8d'}"></span>
-        <span>${escapeHTML(o.type || '泉質未設定')}</span>
-      </span>
+      <span class="detail-badge"><span class="onsen-type-dot" style="background:${typeColor[o.type] || '#7f8c8d'}"></span><span>${escapeHTML(o.type || '泉質未設定')}</span></span>
+      <span class="detail-badge">都道府県: ${escapeHTML(o.prefecture || '未設定')}</span>
+      <span class="detail-badge">濃さ: ${escapeHTML(o.density || '未設定')}</span>
       <span class="detail-badge">価格: ${escapeHTML(formatPrice(o.price))}</span>
       <span class="detail-badge">評価: ${escapeHTML(formatRating(o.rating))}</span>
       <span class="detail-badge">${selectedNow ? '選択中' : '未選択'}</span>
+      ${o.favorite ? '<span class="detail-badge">★ お気に入り</span>' : ''}
+      ${o.visited ? '<span class="detail-badge">訪問済み</span>' : ''}
     </div>
 
     <section class="detail-section">
@@ -1149,82 +944,157 @@ function showDetail(id){
     <section class="detail-section">
       <h4>基本情報</h4>
       <div class="detail-grid">
-        <div class="detail-field">
-          <span class="detail-label">レビュー</span>
-          <div class="detail-value">${escapeHTML(o.review || '未設定')}</div>
-        </div>
-        <div class="detail-field">
-          <span class="detail-label">営業時間</span>
-          <div class="detail-value">${escapeHTML(o.hours || '未設定')}</div>
-        </div>
-        <div class="detail-field">
-          <span class="detail-label">住所</span>
-          <div class="detail-value">${escapeHTML(o.address || '未設定')}</div>
-        </div>
-        <div class="detail-field">
-          <span class="detail-label">座標</span>
-          <div class="detail-value">${o.lat.toFixed(6)}, ${o.lng.toFixed(6)}</div>
-        </div>
+        <div class="detail-field"><span class="detail-label">都道府県</span><div class="detail-value">${escapeHTML(o.prefecture || '未設定')}</div></div>
+        <div class="detail-field"><span class="detail-label">濃さ</span><div class="detail-value">${escapeHTML(o.density || '未設定')}</div></div>
+        <div class="detail-field"><span class="detail-label">レビュー</span><div class="detail-value">${escapeHTML(o.review || '未設定')}</div></div>
+        <div class="detail-field"><span class="detail-label">営業時間</span><div class="detail-value">${escapeHTML(o.hours || '未設定')}</div></div>
+        <div class="detail-field"><span class="detail-label">住所</span><div class="detail-value">${escapeHTML(o.address || '未設定')}</div></div>
+        <div class="detail-field"><span class="detail-label">座標</span><div class="detail-value">${o.lat.toFixed(6)}, ${o.lng.toFixed(6)}</div></div>
       </div>
 
       <div class="detail-actions">
         <button class="ghost-btn" onclick="focusOnsen(${id}, false)">地図へ移動</button>
-        <button class="${selectedNow ? 'solid-btn is-selected' : 'solid-btn'}" onclick="toggle(${id}, {showDetail:true})">${selectedNow ? '選択解除' : 'ルートに追加'}</button>
+        <button class="${selectedNow ? 'solid-btn is-selected' : 'solid-btn'}" onclick="toggle(${id}); showDetail(${id});">${selectedNow ? '選択解除' : 'ルートに追加'}</button>
+      </div>
+      <div class="detail-actions">
+        <button class="subtle-btn" onclick="toggleFavorite(${id}); showDetail(${id});">${o.favorite ? '★ お気に入り解除' : '☆ お気に入り'}</button>
+        <button class="subtle-btn" onclick="toggleVisited(${id}); showDetail(${id});">${o.visited ? '訪問済み解除' : '訪問済みにする'}</button>
       </div>
       ${o.url ? `<div class="detail-actions"><a class="detail-link" href="${escapeAttr(o.url)}" target="_blank" rel="noopener noreferrer">公式サイトを開く</a></div>` : ''}
-    </section>
-  `;
+    </section>`;
 
-  document.getElementById("detailSheet").classList.add("open");
-  document.getElementById("detailOverlay").classList.add("show");
-  document.getElementById("detailSheet").setAttribute("aria-hidden", "false");
+  document.documentElement.style.setProperty('--sheet-translate', '0px');
+  document.getElementById('detailSheet').classList.add('open');
+  document.getElementById('detailOverlay').classList.add('show');
+  document.getElementById('detailSheet').setAttribute('aria-hidden', 'false');
 }
 
 function closeDetail(){
-  document.getElementById("detailSheet").classList.remove("open");
-  document.getElementById("detailOverlay").classList.remove("show");
-  document.getElementById("detailSheet").setAttribute("aria-hidden", "true");
+  document.documentElement.style.setProperty('--sheet-translate', 'calc(100% + 24px)');
+  document.getElementById('detailSheet').classList.remove('open');
+  document.getElementById('detailOverlay').classList.remove('show');
+  document.getElementById('detailSheet').setAttribute('aria-hidden', 'true');
+}
+
+function setupDetailDrag(){
+  const sheet = document.getElementById('detailSheet');
+  const head = document.getElementById('detailHead');
+  const body = document.getElementById('detailBody');
+
+  const start = (clientY) => {
+    if(sheet.getAttribute('aria-hidden') === 'true') return;
+    detailDrag = { startY: clientY, deltaY: 0, dragging: true };
+    head.classList.add('dragging');
+    sheet.style.transition = 'none';
+  };
+  const move = (clientY) => {
+    if(!detailDrag?.dragging) return;
+    const delta = Math.max(0, clientY - detailDrag.startY);
+    detailDrag.deltaY = delta;
+    document.documentElement.style.setProperty('--sheet-translate', `${delta}px`);
+  };
+  const end = () => {
+    if(!detailDrag?.dragging) return;
+    const shouldClose = detailDrag.deltaY > Math.min(window.innerHeight * 0.18, 140);
+    detailDrag.dragging = false;
+    head.classList.remove('dragging');
+    sheet.style.transition = '';
+    if(shouldClose) closeDetail();
+    else document.documentElement.style.setProperty('--sheet-translate', '0px');
+    detailDrag = null;
+  };
+
+  head.addEventListener('touchstart', e => start(e.touches[0].clientY), { passive:true });
+  head.addEventListener('touchmove', e => move(e.touches[0].clientY), { passive:true });
+  head.addEventListener('touchend', end);
+  head.addEventListener('mousedown', e => { start(e.clientY); e.preventDefault(); });
+  window.addEventListener('mousemove', e => move(e.clientY));
+  window.addEventListener('mouseup', end);
+
+  body.addEventListener('touchstart', e => {
+    if(body.scrollTop <= 0) start(e.touches[0].clientY);
+  }, { passive:true });
+  body.addEventListener('touchmove', e => {
+    if(detailDrag?.dragging) move(e.touches[0].clientY);
+  }, { passive:true });
+  body.addEventListener('touchend', end);
 }
 
 function formatPrice(value){
-  const n = Number(String(value).replace(/[^\d.]/g, ""));
-  if(!Number.isFinite(n) || !value) return "未設定";
-  return `${n.toLocaleString("ja-JP")}円`;
+  const n = Number(String(value).replace(/[^\d.]/g, ''));
+  if(!Number.isFinite(n) || !value) return '未設定';
+  return `${n.toLocaleString('ja-JP')}円`;
 }
-
 function formatRating(value){
   const n = Number(value);
-  if(!Number.isFinite(n)) return "未設定";
+  if(!Number.isFinite(n)) return '未設定';
   return n.toFixed(1);
 }
-
 function normalizePrice(value){
-  const n = Number(String(value).replace(/[^\d.]/g, ""));
+  const n = Number(String(value).replace(/[^\d.]/g, ''));
   return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY;
 }
-
 function normalizeRating(value){
   const n = Number(value);
   return Number.isFinite(n) ? n : Number.NEGATIVE_INFINITY;
 }
-
+function toBool(v){
+  return ['1','true','yes','y'].includes(String(v || '').trim().toLowerCase());
+}
+function matchPriceFilter(value, filter){
+  const n = Number(String(value).replace(/[^\d.]/g, ''));
+  if(!Number.isFinite(n)) return filter === 'unknown';
+  if(filter === 'cheap') return n <= 1000;
+  if(filter === 'mid') return n >= 1001 && n <= 1500;
+  if(filter === 'high') return n >= 1501;
+  return true;
+}
+function getDistanceValue(o){
+  if(!currentLocation) return Number.POSITIVE_INFINITY;
+  return haversine(currentLocation.lat, currentLocation.lng, o.lat, o.lng);
+}
+function formatDistance(km){
+  if(!Number.isFinite(km)) return '未取得';
+  return km < 10 ? `${km.toFixed(1)}km` : `${Math.round(km)}km`;
+}
+function haversine(lat1, lon1, lat2, lon2){
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
 function escapeHTML(value){
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return String(value ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
-
 function escapeAttr(value){
-  return escapeHTML(value).replace(/`/g, "&#96;");
+  return escapeHTML(value).replace(/`/g, '&#96;');
 }
 
-document.addEventListener("keydown", (e) => {
-  if(e.key === "Escape"){
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-popup-action]');
+  if(!btn) return;
+  const id = Number(btn.dataset.id);
+  if(btn.dataset.popupAction === 'toggle'){
+    toggle(id);
+    openPointActionPopup(id, [onsens[id].lng, onsens[id].lat]);
+  }else if(btn.dataset.popupAction === 'detail'){
+    showDetail(id);
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape'){
     closeMenu();
     closeDetail();
+    closePointPopup();
+  }
+});
+
+window.addEventListener('orientationchange', () => setTimeout(resetViewportScale, 50));
+window.addEventListener('resize', () => {
+  if(document.getElementById('detailSheet').classList.contains('open') && !detailDrag) {
+    document.documentElement.style.setProperty('--sheet-translate', '0px');
   }
 });
 </script>
