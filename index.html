@@ -138,6 +138,9 @@ button{touch-action:manipulation;}
 .menu-grid{display:grid;gap:10px;}
 .menu-grid input,.menu-grid select{width:100%;padding:11px 12px;border-radius:12px;border:1px solid #dbe2ea;background:#fff;}
 .filter-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.filter-tools{display:grid;gap:10px;margin-top:10px;}
+.full-width{width:100%;}
+.filter-summary{font-size:12px;color:#475569;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:10px 12px;line-height:1.5;}
 .stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
 .stat-chip{background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:10px;font-size:12px;text-align:center;}
 .stat-chip strong{display:block;font-size:16px;color:#111827;}
@@ -260,11 +263,11 @@ button{touch-action:manipulation;}
       <section class="menu-block">
         <h4>絞り込み</h4>
         <div class="filter-grid">
-          <select id="prefectureFilter" onchange="renderOnsenList()">
-            <option value="">都道府県をすべて表示</option>
-          </select>
           <select id="typeFilter" onchange="renderOnsenList()">
             <option value="">泉質をすべて表示</option>
+          </select>
+          <select id="prefectureFilter" onchange="renderOnsenList()">
+            <option value="">都道府県をすべて表示</option>
           </select>
           <select id="densityFilter" onchange="renderOnsenList()">
             <option value="">濃さをすべて表示</option>
@@ -287,9 +290,9 @@ button{touch-action:manipulation;}
             <option value="exclude">未訪問のみ</option>
           </select>
         </div>
-        <div class="filter-actions">
-          <button class="ghost-btn filter-reset-btn" onclick="resetFilters()">絞り込み解除</button>
-          <div id="filterSummary" class="filter-summary"></div>
+        <div class="filter-tools">
+          <button class="ghost-btn full-width" onclick="clearFilters()">絞り込み解除</button>
+          <div id="filterSummary" class="filter-summary">0件 / 0件</div>
         </div>
         <div class="menu-note">お気に入り・訪問済み・選択ルートは端末内に保存されます。</div>
       </section>
@@ -450,7 +453,7 @@ async function init(){
 }
 
 async function loadCSV(){
-  const txt = await (await fetch('onsen_stage5_plus.csv')).text();
+  const txt = await (await fetch('onsen.csv')).text();
   onsens = parseCSV(txt).map((row, i) => ({
     id: i,
     name: (row.name || '').trim(),
@@ -512,31 +515,8 @@ function parseCSV(text){
 
 function setupFilterOptions(){
   const typeSelect = document.getElementById('typeFilter');
-  const prefectureSelect = document.getElementById('prefectureFilter');
-  const densitySelect = document.getElementById('densityFilter');
-
   const types = [...new Set(onsens.map(o => o.type).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'ja'));
-  const prefectures = [...new Set(onsens.map(o => o.prefecture).filter(Boolean))].sort((a,b) => a.localeCompare(b, 'ja'));
-  const densityOrder = ['濃い', 'やや濃い', '普通', 'ややあっさり', 'あっさり'];
-  const densitySet = [...new Set(onsens.map(o => o.density).filter(Boolean))];
-  const densities = densitySet.sort((a,b) => {
-    const ai = densityOrder.indexOf(a);
-    const bi = densityOrder.indexOf(b);
-    if(ai === -1 && bi === -1) return a.localeCompare(b, 'ja');
-    if(ai === -1) return 1;
-    if(bi === -1) return -1;
-    return ai - bi;
-  });
-
-  if(prefectureSelect){
-    prefectureSelect.innerHTML = '<option value="">都道府県をすべて表示</option>' + prefectures.map(v => `<option value="${escapeAttr(v)}">${escapeHTML(v)}</option>`).join('');
-  }
-  if(typeSelect){
-    typeSelect.innerHTML = '<option value="">泉質をすべて表示</option>' + types.map(v => `<option value="${escapeAttr(v)}">${escapeHTML(v)}</option>`).join('');
-  }
-  if(densitySelect){
-    densitySelect.innerHTML = '<option value="">濃さをすべて表示</option>' + densities.map(v => `<option value="${escapeAttr(v)}">${escapeHTML(v)}</option>`).join('');
-  }
+  typeSelect.innerHTML = '<option value="">泉質をすべて表示</option>' + types.map(t => `<option value="${escapeAttr(t)}">${escapeHTML(t)}</option>`).join('');
 }
 
 function setupMap(){
@@ -686,8 +666,8 @@ function renderSelected(){
 
 function getFilteredOnsens(){
   const keyword = (document.getElementById('searchBox')?.value || '').trim().toLowerCase();
-  const prefectureFilter = document.getElementById('prefectureFilter')?.value || '';
   const typeFilter = document.getElementById('typeFilter')?.value || '';
+  const prefectureFilter = document.getElementById('prefectureFilter')?.value || '';
   const densityFilter = document.getElementById('densityFilter')?.value || '';
   const priceFilter = document.getElementById('priceFilter')?.value || '';
   const favoriteFilter = document.getElementById('favoriteFilter')?.value || '';
@@ -698,18 +678,10 @@ function getFilteredOnsens(){
   if(keyword){
     list = list.filter(o => [o.name, o.type, o.density, o.prefecture, o.review, o.description, o.address].filter(Boolean).some(v => v.toLowerCase().includes(keyword)));
   }
-  if(prefectureFilter){
-    list = list.filter(o => o.prefecture === prefectureFilter);
-  }
-  if(typeFilter){
-    list = list.filter(o => o.type === typeFilter);
-  }
-  if(densityFilter){
-    list = list.filter(o => o.density === densityFilter);
-  }
-  if(priceFilter){
-    list = list.filter(o => matchPriceFilter(o.price, priceFilter));
-  }
+  if(typeFilter) list = list.filter(o => o.type === typeFilter);
+  if(prefectureFilter) list = list.filter(o => o.prefecture === prefectureFilter);
+  if(densityFilter) list = list.filter(o => o.density === densityFilter);
+  if(priceFilter) list = list.filter(o => matchPriceFilter(o.price, priceFilter));
   if(favoriteFilter === 'only') list = list.filter(o => o.favorite);
   if(favoriteFilter === 'exclude') list = list.filter(o => !o.favorite);
   if(visitedFilter === 'only') list = list.filter(o => o.visited);
@@ -724,54 +696,15 @@ function getFilteredOnsens(){
   return list;
 }
 
-function updateFilterSummary(resultCount){
-  const el = document.getElementById('filterSummary');
-  if(!el) return;
-  const total = onsens.length;
-  const active = [];
-  const prefecture = document.getElementById('prefectureFilter')?.value;
-  const type = document.getElementById('typeFilter')?.value;
-  const density = document.getElementById('densityFilter')?.value;
-  const price = document.getElementById('priceFilter')?.value;
-  const favorite = document.getElementById('favoriteFilter')?.value;
-  const visited = document.getElementById('visitedFilter')?.value;
-  if(prefecture) active.push(`都道府県:${prefecture}`);
-  if(type) active.push(`泉質:${type}`);
-  if(density) active.push(`濃さ:${density}`);
-  if(price) active.push(`価格:${labelForPriceFilter(price)}`);
-  if(favorite) active.push(favorite === 'only' ? 'お気に入りのみ' : 'お気に入り以外');
-  if(visited) active.push(visited === 'only' ? '訪問済みのみ' : '未訪問のみ');
-  el.textContent = active.length ? `${resultCount}件 / ${total}件　${active.join(' / ')}` : `${resultCount}件 / ${total}件`;
-}
-
-function labelForPriceFilter(value){
-  if(value === 'cheap') return '1000円以下';
-  if(value === 'mid') return '1001〜1500円';
-  if(value === 'high') return '1501円以上';
-  if(value === 'unknown') return '価格未設定';
-  return '';
-}
-
-function resetFilters(){
-  const ids = ['searchBox', 'prefectureFilter', 'typeFilter', 'densityFilter', 'priceFilter', 'favoriteFilter', 'visitedFilter', 'sortSelect'];
-  ids.forEach(id => {
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.value = id === 'sortSelect' ? 'default' : '';
-  });
-  renderOnsenList();
-}
-
 function renderOnsenList(){
   const el = document.getElementById('onsenList');
   if(!el) return;
   const list = getFilteredOnsens();
+  updateFilterSummary(list.length);
   if(!list.length){
     el.innerHTML = '<div class="no-result">該当する温泉がありません。</div>';
-    updateFilterSummary(0);
     return;
   }
-  updateFilterSummary(list.length);
   el.innerHTML = list.map(o => {
     const selectedClass = selected.includes(o.id) ? 'solid-btn is-selected' : 'solid-btn';
     const selectedLabel = selected.includes(o.id) ? '選択解除' : '選択';
@@ -1040,6 +973,35 @@ function normalizeRating(value){
 }
 function toBool(v){
   return ['1','true','yes','y'].includes(String(v || '').trim().toLowerCase());
+}
+function clearFilters(){
+  const ids = ['searchBox','typeFilter','prefectureFilter','densityFilter','priceFilter','favoriteFilter','visitedFilter','sortSelect'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.value = (id === 'sortSelect') ? 'default' : '';
+  });
+  renderOnsenList();
+}
+function updateFilterSummary(filteredCount){
+  const el = document.getElementById('filterSummary');
+  if(!el) return;
+  const parts = [];
+  const type = document.getElementById('typeFilter')?.value;
+  const prefecture = document.getElementById('prefectureFilter')?.value;
+  const density = document.getElementById('densityFilter')?.value;
+  const price = document.getElementById('priceFilter')?.value;
+  const favorite = document.getElementById('favoriteFilter')?.value;
+  const visited = document.getElementById('visitedFilter')?.value;
+  if(type) parts.push(`泉質: ${type}`);
+  if(prefecture) parts.push(`都道府県: ${prefecture}`);
+  if(density) parts.push(`濃さ: ${density}`);
+  if(price){
+    const map = {cheap:'1000円以下', mid:'1001〜1500円', high:'1501円以上', unknown:'価格未設定'};
+    parts.push(`価格: ${map[price] || price}`);
+  }
+  if(favorite) parts.push(`お気に入り: ${favorite === 'only' ? 'のみ' : '除外'}`);
+  if(visited) parts.push(`訪問: ${visited === 'only' ? '訪問済みのみ' : '未訪問のみ'}`);
+  el.textContent = `${filteredCount}件 / ${onsens.length}件` + (parts.length ? `  |  ${parts.join(' / ')}` : '');
 }
 function matchPriceFilter(value, filter){
   const n = Number(String(value).replace(/[^\d.]/g, ''));
